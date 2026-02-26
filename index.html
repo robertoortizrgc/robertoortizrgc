@@ -15,9 +15,10 @@
     <!-- 3. Babel (Traduce el código JSX para que el navegador lo entienda) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 4. Iconos Lucide y Librería de PDF -->
+    <!-- 4. Iconos Lucide y Librerías de PDF Nativas (jsPDF + autoTable) -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     
@@ -28,8 +29,21 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- MAPEO DE ICONOS PARA HTML ---
-        const Icon = ({ name, className }) => <i data-lucide={name} className={className}></i>;
+        // --- SOLUCIÓN ERROR REMOVECHILD: MAPEO SEGURO DE ICONOS ---
+        const Icon = ({ name, className }) => {
+            const svgString = React.useMemo(() => {
+                if (!window.lucide) return '';
+                // Renderizamos el icono en un div temporal desconectado para que 
+                // Lucide no destruya los nodos del DOM que React controla.
+                const div = document.createElement('div');
+                div.innerHTML = `<i data-lucide="${name}" class="${className || ''}"></i>`;
+                window.lucide.createIcons({ root: div });
+                return div.innerHTML;
+            }, [name, className]);
+
+            return <span className="contents" dangerouslySetInnerHTML={{ __html: svgString }} />;
+        };
+
         const Users = (p) => <Icon name="users" {...p} />;
         const Search = (p) => <Icon name="search" {...p} />;
         const ShieldCheck = (p) => <Icon name="shield-check" {...p} />;
@@ -255,36 +269,280 @@
         const [sindoPassword, setSindoPassword] = useState('');
         const [sindoAuthError, setSindoAuthError] = useState(false);
 
-        // TRUCO PARA RENDERIZAR ICONOS EN HTML PLANO
-        useEffect(() => {
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
-        });
-
         useEffect(() => {
             const styleSheet = document.createElement("style");
             styleSheet.type = "text/css";
             styleSheet.innerText = printStyles;
             document.head.appendChild(styleSheet);
-            return () => document.head.removeChild(styleSheet);
+            return () => {
+                if (document.head.contains(styleSheet)) {
+                    document.head.removeChild(styleSheet);
+                }
+            };
         }, []);
 
         const triggerNativePrint = () => { window.print(); };
 
         const handleDownloadPDF = () => {
+            if (!parsedData) return;
             setIsGeneratingPDF(true);
+            
             setTimeout(() => {
-            const element = document.getElementById('informe-auditoria');
-            const opt = {
-                margin:       [10, 10, 10, 10],
-                filename:     `Dictamen_RGC_${parsedData?.personal?.nss || 'Auditoria'}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, windowWidth: 1024 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            window.html2pdf().set(opt).from(element).save().then(() => setIsGeneratingPDF(false));
-            }, 800);
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF('p', 'pt', 'letter');
+                    
+                    const colorPrimary = [0, 51, 102]; // #003366
+                    const colorGold = [212, 175, 55];  // #D4AF37
+                    const colorRed = [220, 38, 38];
+                    
+                    let yPos = 40;
+                    
+                    // --- PORTADA / ENCABEZADO ---
+                    doc.setFontSize(16);
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("DICTAMEN TÉCNICO DE AUDITORÍA SINDO", 40, yPos);
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFont("helvetica", "normal");
+                    const fechaEmision = new Date().toLocaleDateString('es-MX');
+                    doc.text(`Fecha de Emisión: ${fechaEmision}`, 400, yPos);
+                    
+                    yPos += 20;
+                    doc.setDrawColor(colorGold[0], colorGold[1], colorGold[2]);
+                    doc.setLineWidth(2);
+                    doc.line(40, yPos, 570, yPos);
+                    yPos += 25;
+
+                    // Datos del Asegurado
+                    doc.setFontSize(12);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("1. INFORMACIÓN DEL ASEGURADO", 40, yPos);
+                    yPos += 15;
+                    
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(`Nombre Completo: ${parsedData?.personal?.nombre || 'N/A'}`, 40, yPos);
+                    yPos += 15;
+                    doc.text(`NSS: ${parsedData?.personal?.nss || 'N/A'}`, 40, yPos);
+                    doc.text(`CURP: ${parsedData?.personal?.curp || 'N/A'}`, 250, yPos);
+                    if (sisecData?.totalSemanas) {
+                         doc.text(`Semanas SISEC: ${sisecData.totalSemanas}`, 400, yPos);
+                    }
+                    yPos += 30;
+
+                    // --- DIAGNÓSTICO DE RIESGOS ---
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.text("2. RESUMEN DE RIESGOS DETECTADOS", 40, yPos);
+                    yPos += 15;
+
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont("helvetica", "normal");
+                    
+                    const risksText = [
+                        `• Movimientos de Alto Riesgo (Origen 5-9): ${parsedData.stats.totalRisks}`,
+                        `• Tramites Extemporáneos Detectados: ${parsedData.stats.lateEvents.filter(e => !e.isJustified && !e.isMod40Retro).length}`,
+                        `• Empresas Canceladas (Art. 251 / Baja IMSS): ${parsedData.stats.bajaCompanies.length}`
+                    ];
+                    
+                    risksText.forEach(t => {
+                        doc.text(t, 50, yPos);
+                        yPos += 15;
+                    });
+                    
+                    yPos += 15;
+
+                    // --- TABLAS POR EMPRESA ---
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.text("3. DETALLE DE MOVIMIENTOS POR EMPRESA (HISTORIAL SINDO)", 40, yPos);
+                    yPos += 20;
+
+                    parsedData.grouped.forEach((group, idx) => {
+                        // Salto de página preventivo
+                        if (yPos > 650) { 
+                            doc.addPage(); 
+                            yPos = 40; 
+                        }
+
+                        doc.setFontSize(11);
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                        doc.text(`${idx + 1}. ${group.info.nombre}`, 40, yPos);
+                        yPos += 14;
+                        
+                        doc.setFontSize(9);
+                        doc.setFont("helvetica", "normal");
+                        doc.setTextColor(100, 100, 100);
+                        let subHeader = `Reg. Patronal: ${group.info.registroDisplay} | Periodo: ${group.info.periodIndex} de ${group.info.totalPeriods}`;
+                        if (group.info.isBaja) subHeader += ` | ESTATUS: BAJA POR IMSS (${group.info.bajaReason})`;
+                        if (group.info.isInternalAdjustment) subHeader += ` | ESTATUS: AJUSTE INTERNO IMSS`;
+                        doc.text(subHeader, 40, yPos);
+                        yPos += 10;
+
+                        // Preparar datos de la tabla
+                        const tableBody = group.movements.map(mov => {
+                            const tipoIni = TIPO_MAP[mov.tipoIni] || mov.tipoIni;
+                            const origenIni = ORIGEN_MAP[mov.origenIni] || mov.origenIni;
+                            const isRiskIni = isRiskOrigin(mov.origenIni);
+                            
+                            const tipoFin = TIPO_MAP[mov.tipoFin] || mov.tipoFin;
+                            const isBaja = mov.tipoFin === '2';
+                            const origenFin = ORIGEN_MAP[mov.origenFin] || mov.origenFin;
+                            const isRiskFin = isRiskOrigin(mov.origenFin);
+
+                            let obs = [];
+                            if (mov.lateInfo?.isLate) {
+                                if (mov.lateInfo.isMod40Retro) obs.push('M40 Retroactiva');
+                                else if (!mov.lateInfo.isJustified) obs.push(`Extemp: ${mov.lateInfo.label}`);
+                            }
+                            if (isRiskIni) obs.push(`Riesgo (Inicio): Origen ${mov.origenIni}`);
+                            if (isRiskFin && mov.fBaja) obs.push(`Riesgo (Cierre): Origen ${mov.origenFin}`);
+                            if (mov.fRecep === '00/00/0000') obs.push('Fecha Recepción: 00/00/0000');
+                            if (mov.isPostBaja) obs.push('MOVIMIENTO POST-CLAUSURA');
+
+                            return [
+                                mov.fMov,
+                                `${tipoIni}\nOrigen: ${origenIni}`,
+                                `$${mov.salario}`,
+                                mov.fBaja ? `${mov.fBaja}\n(${isBaja ? 'Baja' : 'Cierre'})` : 'Vigente',
+                                obs.length > 0 ? obs.join('\n') : 'Trámite Regular'
+                            ];
+                        });
+
+                        doc.autoTable({
+                            startY: yPos,
+                            head: [['Fecha Efectiva', 'Movimiento (Inicio)', 'Salario', 'Cierre / Baja', 'Observaciones']],
+                            body: tableBody,
+                            theme: 'grid',
+                            headStyles: { 
+                                fillColor: colorPrimary, 
+                                textColor: [255, 255, 255], 
+                                fontSize: 8, 
+                                fontStyle: 'bold',
+                                halign: 'center'
+                            },
+                            bodyStyles: { 
+                                fontSize: 8, 
+                                valign: 'middle',
+                                textColor: [50, 50, 50]
+                            },
+                            columnStyles: {
+                                0: { cellWidth: 70, halign: 'center', fontStyle: 'bold' },
+                                1: { cellWidth: 140 },
+                                2: { cellWidth: 60, halign: 'right', fontStyle: 'bold' },
+                                3: { cellWidth: 80, halign: 'center' },
+                                4: { cellWidth: 'auto' }
+                            },
+                            didParseCell: function(data) {
+                                if (data.section === 'body') {
+                                    if (data.column.index === 4 && data.cell.raw !== 'Trámite Regular') {
+                                        data.cell.styles.textColor = colorRed;
+                                        data.cell.styles.fontStyle = 'bold';
+                                        data.cell.styles.fillColor = [254, 242, 242]; // red-50
+                                    }
+                                }
+                            },
+                            margin: { left: 40, right: 40 }
+                        });
+
+                        yPos = doc.lastAutoTable.finalY + 25;
+                    });
+                    
+                    // --- SECCIÓN DE CRUCE SISEC ---
+                    if (cruceData && cruceData.patronesComparados.length > 0) {
+                        doc.addPage();
+                        yPos = 40;
+                        doc.setFontSize(16);
+                        doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                        doc.setFont("helvetica", "bold");
+                        doc.text("4. AUDITORÍA CRUZADA: SINDO VS SISEC", 40, yPos);
+                        
+                        yPos += 10;
+                        doc.setDrawColor(colorGold[0], colorGold[1], colorGold[2]);
+                        doc.setLineWidth(2);
+                        doc.line(40, yPos, 570, yPos);
+                        yPos += 25;
+
+                        cruceData.patronesComparados.forEach((comp, idx) => {
+                             if (yPos > 650) { doc.addPage(); yPos = 40; }
+
+                             doc.setFontSize(11);
+                             doc.setFont("helvetica", "bold");
+                             doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                             doc.text(`${idx + 1}. ${comp.nombre}`, 40, yPos);
+                             yPos += 12;
+                             
+                             doc.setFontSize(9);
+                             doc.setFont("helvetica", "normal");
+                             doc.setTextColor(100, 100, 100);
+                             doc.text(`Reg. Patronal: ${comp.registro} | Estatus Cruce: ${comp.status}`, 40, yPos);
+                             yPos += 10;
+
+                             const cruceBody = comp.movimientosCruzados.map(mov => {
+                                 const sisecText = mov.sisec ? `${mov.sisec.tipoOriginal}\n${mov.sisec.fecha}\n$${mov.sisec.salario}` : 'No reportado';
+                                 const sindoText = mov.sindo ? `${mov.sindo.tipoOriginal}\n${mov.sindo.fecha}\n$${mov.sindo.salario}` : 'No reportado';
+                                 let statusText = mov.status;
+                                 if(statusText === 'MATCH') statusText = 'Coincide OK';
+                                 if(statusText === 'MISMATCH_SALARIO') statusText = 'Dif. Salarial';
+                                 if(statusText === 'ONLY_SISEC') statusText = 'Falta en SINDO';
+                                 if(statusText === 'ONLY_SINDO') statusText = 'Falta en SISEC';
+
+                                 return [ mov.tipoClasif, sisecText, sindoText, statusText ];
+                             });
+
+                             doc.autoTable({
+                                startY: yPos,
+                                head: [['Clasificación', 'Reporte SISEC', 'Historial SINDO', 'Estatus']],
+                                body: cruceBody,
+                                theme: 'grid',
+                                headStyles: { fillColor: colorGold, textColor: colorPrimary, fontSize: 8, fontStyle: 'bold', halign: 'center' },
+                                bodyStyles: { fontSize: 8, valign: 'middle' },
+                                columnStyles: {
+                                    0: { cellWidth: 70, halign: 'center' },
+                                    1: { cellWidth: 150 },
+                                    2: { cellWidth: 150 },
+                                    3: { cellWidth: 'auto', halign: 'center', fontStyle: 'bold' }
+                                },
+                                didParseCell: function(data) {
+                                    if (data.section === 'body' && data.column.index === 3) {
+                                        if (data.cell.raw !== 'Coincide OK') {
+                                            data.cell.styles.textColor = colorRed;
+                                        } else {
+                                            data.cell.styles.textColor = [5, 150, 105]; // emerald
+                                        }
+                                    }
+                                },
+                                margin: { left: 40, right: 40 }
+                            });
+                            yPos = doc.lastAutoTable.finalY + 25;
+                        });
+                    }
+
+                    // --- PIE DE PÁGINA (PAGINACIÓN) ---
+                    const pageCount = doc.internal.getNumberOfPages();
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.text(`Página ${i} de ${pageCount} - Dictamen Generado por Portal RGC`, 40, 770);
+                    }
+
+                    doc.save(`Dictamen_RGC_${parsedData.personal?.nss || 'Auditoria'}.pdf`);
+                } catch (error) {
+                    console.error("Error al generar PDF: ", error);
+                    alert("Ocurrió un error al generar el PDF nativo. Verifique la consola.");
+                } finally {
+                    setIsGeneratingPDF(false);
+                }
+            }, 100);
         };
 
         const handleDownloadCSV = () => {
