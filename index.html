@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal RGC Optimizado</title>
+    
+    <!-- 1. Tailwind CSS para los estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. React y ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Babel (Traduce el código JSX para que el navegador lo entienda) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 4. Iconos Lucide y Librería de PDF -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans">
+    
+    <!-- Aquí es donde React va a "inyectar" toda la aplicación -->
+    <div id="root"></div>
+
+    <!-- Script principal de la aplicación -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- MAPEO DE ICONOS PARA HTML ---
+        const Icon = ({ name, className }) => <i data-lucide={name} className={className}></i>;
+        const Users = (p) => <Icon name="users" {...p} />;
+        const Search = (p) => <Icon name="search" {...p} />;
+        const ShieldCheck = (p) => <Icon name="shield-check" {...p} />;
+        const Briefcase = (p) => <Icon name="briefcase" {...p} />;
+        const AlertCircle = (p) => <Icon name="alert-circle" {...p} />;
+        const LayoutGrid = (p) => <Icon name="layout-grid" {...p} />;
+        const FileText = (p) => <Icon name="file-text" {...p} />;
+        const ArrowRight = (p) => <Icon name="arrow-right" {...p} />;
+        const AlertTriangle = (p) => <Icon name="alert-triangle" {...p} />;
+        const CheckCircle2 = (p) => <Icon name="check-circle-2" {...p} />;
+        const Ban = (p) => <Icon name="ban" {...p} />;
+        const Siren = (p) => <Icon name="siren" {...p} />;
+        const XCircle = (p) => <Icon name="x-circle" {...p} />;
+        const CalendarX = (p) => <Icon name="calendar-x" {...p} />;
+        const FileWarning = (p) => <Icon name="file-warning" {...p} />;
+        const Building2 = (p) => <Icon name="building-2" {...p} />;
+        const Thermometer = (p) => <Icon name="thermometer" {...p} />;
+        const Printer = (p) => <Icon name="printer" {...p} />;
+        const GitMerge = (p) => <Icon name="git-merge" {...p} />;
+        const BookOpen = (p) => <Icon name="book-open" {...p} />;
+        const Calculator = (p) => <Icon name="calculator" {...p} />;
+        const ChevronLeft = (p) => <Icon name="chevron-left" {...p} />;
+        const Download = (p) => <Icon name="download" {...p} />;
+        const FileSpreadsheet = (p) => <Icon name="file-spreadsheet" {...p} />;
+        const Eye = (p) => <Icon name="eye" {...p} />;
+        const History = (p) => <Icon name="history" {...p} />;
+
+        // --- ESTILOS GLOBALES DE IMPRESIÓN Y GENERADOR PDF ---
+        const printStyles = `
+        @media print {
+            @page { size: A4 portrait; margin: 1.5cm; }
+            body { 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+                background-color: white !important; 
+                font-family: 'Inter', system-ui, sans-serif !important;
+                color: #1e293b !important;
+            }
+            .print-hidden { display: none !important; }
+            .print-block { display: block !important; }
+            .print-flex { display: flex !important; }
+            .page-break { page-break-before: always; }
+            .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+            * { box-shadow: none !important; }
+            .print-border { border: 1px solid #cbd5e1 !important; }
+            .print-bg-blue { background-color: #003366 !important; color: white !important; }
+            .print-bg-gold { background-color: #D4AF37 !important; color: #003366 !important; }
+            .print-text-blue { color: #003366 !important; }
+            .print-text-gold { color: #D4AF37 !important; }
+            .tab-content { display: block !important; }
+        }
+
+        .pdf-mode {
+            background-color: white !important;
+            padding: 20px !important;
+            color: #1e293b !important;
+        }
+        .pdf-mode .print\\:hidden { display: none !important; }
+        .pdf-mode .print\\:block { display: block !important; }
+        .pdf-mode .print\\:flex { display: flex !important; }
+        .pdf-mode .print\\:shadow-none { box-shadow: none !important; }
+        .pdf-mode .print\\:bg-white { background-color: white !important; }
+        .pdf-mode .print\\:border { border: 1px solid #cbd5e1 !important; }
+        .pdf-mode .tab-content { display: block !important; }
+        .pdf-mode .page-break { page-break-before: always; }
+        .pdf-mode .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+        `;
+
+        // --- DEFINICIONES Y MAPEOS ---
+        const ORIGEN_MAP = {
+        '0': 'Ventanilla', '1': 'Ajuste automático', '2': 'Dispositivo magnético',
+        '3': 'Auditoría (Autocorrección)', '4': 'IDSE (Internet)', '5': 'Auditoría IMSS (SIREM)',
+        '6': 'Auditoría IMSS (Auto)', '7': 'Auditoría SIVEPA (Multa)', '8': 'Capturado Manualmente',
+        '9': 'Baja Extemporánea Empresarial'
+        };
+
+        const TIPO_MAP = {
+        '8': 'Reingreso', '7': 'Modif. Salarial', '1': 'Alta', '2': 'Baja'
+        };
+
+        // --- UTILIDADES ---
+        const parseDateStr = (str) => {
+        if (!str) return null;
+        const match = str.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+        if (!match) return null;
+        const [_, day, month, year] = match.map(Number);
+        if (!day || !month || !year) return null; 
+        return new Date(year, month - 1, day);
+        };
+
+        const formatDate = (date) => {
+        if (!date) return '';
+        return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        };
+
+        const isRiskOrigin = (code) => {
+        const num = parseInt(code, 10);
+        return num >= 5 && num <= 9;
+        };
+
+        const isInternalAdjustment = (regPatronal) => {
+        if (!regPatronal) return false;
+        return /9{4,}00$/.test(regPatronal);
+        };
+
+        // --- TERMÓMETRO DE EXTEMPORANEIDAD ---
+        const getLateSubmissionInfo = (fRecep, fMov) => {
+        if (!fRecep || fRecep === '00/00/0000') return { isLate: false }; 
+        const dRecep = parseDateStr(fRecep);
+        const dMov = parseDateStr(fMov);
+        if (!dRecep || !dMov) return { isLate: false };
+
+        const diffTime = dRecep.getTime() - dMov.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        if (diffDays <= 5) return { isLate: false };
+
+        let weekendDays = 0;
+        let curDate = new Date(dMov.getTime());
+        curDate.setDate(curDate.getDate() + 1); 
+        while (curDate <= dRecep) {
+            const dayOfWeek = curDate.getDay();
+            if (dayOfWeek === 0 || dayOfWeek === 6) weekendDays++;
+            curDate.setDate(curDate.getDate() + 1);
+        }
+
+        const businessDays = diffDays - weekendDays;
+        let level = 0, colorClass = '', label = '', badgeClass = '', obs = '';
+
+        if (businessDays <= 5) {
+            return {
+                isLate: true,
+                isJustified: true,
+                diffDays,
+                businessDays,
+                level: 0,
+                label: 'En Tiempo (Hábiles)',
+                colorClass: 'text-emerald-600',
+                badgeClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                obs: `Se cruzaron ${weekendDays} días inhábiles (sábado/domingo).`
+            };
+        }
+
+        if (diffDays >= 6 && diffDays <= 14) {
+            level = 1; label = '5 a 14 días'; colorClass = 'text-yellow-600'; badgeClass = 'bg-yellow-50 border-yellow-200 text-yellow-700';
+        } else if (diffDays >= 15 && diffDays <= 30) {
+            level = 2; label = '15 a 30 días'; colorClass = 'text-orange-500'; badgeClass = 'bg-orange-50 border-orange-200 text-orange-700 font-semibold';
+        } else if (diffDays > 30 && diffDays <= 365) {
+            level = 3; label = '1 a 12 meses'; colorClass = 'text-red-500'; badgeClass = 'bg-red-50 border-red-300 text-red-700 font-bold';
+        } else if (diffDays > 365) {
+            level = 4; label = '+ de 1 año'; colorClass = 'text-rose-600'; badgeClass = 'bg-rose-600 border-rose-700 text-white font-black shadow-md';
+        }
+
+        if (weekendDays > 0) {
+            obs = `Excedido. Incluye ${weekendDays} días inhábiles de fin de semana.`;
+        }
+
+        return { isLate: true, isJustified: false, diffDays, businessDays, level, label, colorClass, badgeClass, obs };
+        };
+
+        // --- COMPONENTES VISUALES ---
+        const StatusBadge = ({ code, map, type, isRisk, colorOverride }) => {
+        const label = map[code] || `Código ${code}`;
+        let styles = type === 'O' 
+            ? 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border' 
+            : 'bg-slate-50 text-slate-700 border-slate-200 print-border';
+
+        if (colorOverride) styles = colorOverride;
+        if (isRisk) styles = 'bg-rose-100 text-rose-800 border-rose-200 font-bold print-border print-text-rose-600';
+
+        return (
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] uppercase tracking-tight w-fit ${styles}`}>
+            <span className="opacity-60 font-semibold">{type}:</span>
+            <span className="font-semibold">{label}</span>
+            {isRisk && <AlertCircle className="w-3 h-3 text-rose-600" />}
+            </div>
+        );
+        };
+
+        const StatusBadgeCruce = ({ status }) => {
+        let styles = "";
+        if(status === 'CRITICO') styles = "bg-rose-600 text-white border-rose-700 print-bg-rose-600";
+        if(status === 'ALERTA') styles = "bg-orange-500 text-white border-orange-600";
+        if(status === 'INFO') styles = "bg-[#003366] text-white border-[#002244] print-bg-blue";
+        if(status === 'OK') styles = "bg-emerald-50 text-emerald-700 border-emerald-200";
+        
+        return (
+            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md border shadow-sm ${styles}`}>
+                {status}
+            </span>
+        )
+        };
+
+        const ModuloPension = () => {
+        return (
+            <div className="w-full h-[85vh] min-h-[600px] rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center relative shadow-inner">
+                <iframe 
+                src="https://robertoiroc.github.io/COTIZADOR/" 
+                title="Cálculo de Pensión RGC" 
+                className="w-full h-full border-0 bg-white"
+                allow="clipboard-write; clipboard-read"
+                />
+            </div>
+        );
+        };
+
+        const App = () => {
+        const [rawData, setRawData] = useState('');
+        const [rawSisec, setRawSisec] = useState('');
+        
+        const [parsedData, setParsedData] = useState(null);
+        const [sisecData, setSisecData] = useState(null);
+        const [cruceData, setCruceData] = useState(null);
+        
+        const [activeTab, setActiveTab] = useState('sindo'); 
+        const [isSisecEnabled, setIsSisecEnabled] = useState(false); 
+        const [currentModule, setCurrentModule] = useState('menu'); 
+        const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+        const [viewMode, setViewMode] = useState('auditor');
+        
+        // --- ESTADOS DE SEGURIDAD PARA SINDO ---
+        const [showSindoAuth, setShowSindoAuth] = useState(false);
+        const [sindoPassword, setSindoPassword] = useState('');
+        const [sindoAuthError, setSindoAuthError] = useState(false);
+
+        // TRUCO PARA RENDERIZAR ICONOS EN HTML PLANO
+        useEffect(() => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+
+        useEffect(() => {
+            const styleSheet = document.createElement("style");
+            styleSheet.type = "text/css";
+            styleSheet.innerText = printStyles;
+            document.head.appendChild(styleSheet);
+            return () => document.head.removeChild(styleSheet);
+        }, []);
+
+        const triggerNativePrint = () => { window.print(); };
+
+        const handleDownloadPDF = () => {
+            setIsGeneratingPDF(true);
+            setTimeout(() => {
+            const element = document.getElementById('informe-auditoria');
+            const opt = {
+                margin:       [10, 10, 10, 10],
+                filename:     `Dictamen_RGC_${parsedData?.personal?.nss || 'Auditoria'}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, windowWidth: 1024 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            window.html2pdf().set(opt).from(element).save().then(() => setIsGeneratingPDF(false));
+            }, 800);
+        };
+
+        const handleDownloadCSV = () => {
+            if (!cruceData) return;
+            let csvContent = "Registro Patronal,Empresa,Clasificacion,Tipo de Movimiento,Estatus Cruce,Fecha SISEC,Salario SISEC,Fecha SINDO,Salario SINDO\\n";
+
+            cruceData.patronesComparados.forEach(comp => {
+                const reg = `"${comp.registro}"`;
+                const emp = `"${comp.nombre}"`;
+
+                if (comp.movimientosCruzados.length === 0) {
+                    csvContent += `${reg},${emp},"","SIN MOVIMIENTOS COMPARABLES","${comp.status}","","","",""\\n`;
+                    return;
+                }
+
+                comp.movimientosCruzados.forEach(mov => {
+                    const clasif = `"${mov.tipoClasif}"`;
+                    const tipoOriginal = `"${mov.sisec?.tipoOriginal || mov.sindo?.tipoOriginal || 'N/A'}"`;
+                    const status = `"${mov.status}"`;
+                    const fSisec = mov.sisec ? `"${mov.sisec.fecha}"` : '""';
+                    const sSisec = mov.sisec ? `"${mov.sisec.salario}"` : '""';
+                    const fSindo = mov.sindo ? `"${mov.sindo.fecha}"` : '""';
+                    const sSindo = mov.sindo ? `"${mov.sindo.salario}"` : '""';
+
+                    csvContent += `${reg},${emp},${clasif},${tipoOriginal},${status},${fSisec},${sSisec},${fSindo},${sSindo}\\n`;
+                });
+            });
+
+            const blob = new Blob(["\\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' }); 
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Cruce_IMSS_${parsedData?.personal?.nss || 'Auditoria'}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        const loadExampleData = () => {
+            const exampleSindo = `
+PPCDQ002 CONSULTA ALFABETICA DEL CATALOGO NACIONAL DE ASEGURADOS 18/02/2026
+PAGINA : 0001 CICS PRODUCCION 06:22:29
+APELLIDO PATERNO: ARZATE
+APELLIDO MATERNO: BERLIOZ
+NOMBRE : VERONICA QUIONIA GUILLERMINA
+NUM.SEG.SOC. D S
+NOMBRE DEL ASEGURADO DL AS AN SEC. V X MES LUGAR
+ARZATE-BERLIOZ-VERONICA QUIONIA GUILLERMINA 8880630232 - 4 2 F ABR E.MEX
+--------------------------------------------------------------------------------
+S.IN.D.O. SP01M CONSULTA NUMERICA DE PATRONES 18/02/2026
+CICS01SS
+REGISTRO PATRONAL Y669999940 - 2 CURP/RFC /
+NOMBRE
+CONTINUACION VOLUNTARIA EN EL REGIMEN OBLIGATORIO
+FECHA DE MOVIMIENTO 01/07/1997 TIPO DE MOVIMIENTO 1
+--------------------------------------------------------------------------------
+S.IN.D.O. SP01M CONSULTA NUMERICA DE PATRONES 18/02/2026
+CICS01SS
+REGISTRO PATRONAL C602404910 - 1 CURP/RFC /
+NOMBRE
+RESTAURANTES IZY DE MEXICO
+FECHA DE MOVIMIENTO 01/01/2018 TIPO DE MOVIMIENTO 2
+CAUSA DE BAJA ART. 251 DE LA LEY DEL S.S. S.S.F. 0
+--------------------------------------------------------------------------------
+S.IN.D.O. SB03M CONSULTA DE CUENTA INDIVIDUAL 18/02/2026
+NUM. DE SEG. SOC. 0184630301 - 2 REGISTRO PATRONAL 9999999999
+ASEG. ARZATE-BERLIOZ-VERONICA QUIONIA GUILLERMINA CICS01SS
+CURP AABV630403MMCRRR02
+---------INICIO---------- SALARIO SEM SUP ----FINAL----- T I
+DEL REG.PAT. F.RECEP. O T FECHA Y TIPO JOR EX SRV O T FECHA T S
+40 Y6699999402 29/10/2025 0 8 02/10/2022 1700.00 F 0 SI NO 9 2 31/10/2025
+16 C6024049101 01/07/2017 4 8 01/07/2017 230.76 F 0 NO NO 4 2 01/09/2017 1
+`;
+            
+            const exampleSisec = `
+BATANA CALLEJA MARCELO NSS: 88806302324
+CURP: BACM630814HDFTLR08
+Total de semanas cotizadas
+1422
+
+Nombre del patrón
+CONTINUACION VOLUNTARIA EN EL REGIMEN OBLIGATORIO
+Registro Patronal
+Y669999940
+Fecha de alta 02/09/2023 Fecha de baja 31/08/2025 Salario Base de Cotización * $ 2593.5
+Tipo de movimiento
+Fecha de movimiento
+Salario Base
+BAJA 31/10/2025 $ 1700.00
+REINGRESO 02/10/2022 $ 1700.00
+
+Nombre del patrón
+RESTAURANTES IZY DE MEXICO
+Registro Patronal
+C602404910
+Fecha de alta 01/07/2017 Fecha de baja 01/09/2017 Salario Base de Cotización * $ 230.76
+Tipo de movimiento
+Fecha de movimiento
+Salario Base
+BAJA 01/09/2017 $ 230.76
+REINGRESO 01/07/2017 $ 230.76
+`;
+            setRawData(exampleSindo.trim());
+            setRawSisec(exampleSisec.trim());
+            setIsSisecEnabled(true); 
+            setTimeout(() => document.getElementById('btn-procesar')?.click(), 100);
+        };
+
+        const parseSISEC = (text) => {
+            const data = { personal: {}, employers: [], totalSemanas: 0 };
+            const nssMatch = text.match(/NSS:\s*([\d\s\-]+)/i);
+            const curpMatch = text.match(/CURP:\s*([A-Z0-9]+)/i);
+            if(nssMatch) data.personal.nss = nssMatch[1].trim();
+            if(curpMatch) data.personal.curp = curpMatch[1].trim();
+
+            const semanasMatch = text.match(/Total\s+de\s+semanas\s+cotizadas[^\d]*(\d+)/i) || text.match(/semanas\s+cotizadas[:\s]*(\d+)/i);
+            if(semanasMatch) data.totalSemanas = parseInt(semanasMatch[1], 10);
+
+            const blocks = text.split(/Nombre\s+del\s+patrón/i).slice(1);
+            const allSisecMovs = [];
+            
+            blocks.forEach(block => {
+                const regMatch = block.match(/Registro\s+Patronal\s*([A-Z0-9]+)/i);
+                if(!regMatch) return;
+                const regPatronal = regMatch[1].trim().substring(0, 10);
+                const nameSection = block.split(/Registro\s+Patronal/i)[0];
+                const name = nameSection.replace(/\\n/g, ' ').trim() || 'DESCONOCIDO';
+
+                const movRegex = /(BAJA|REINGRESO|MODIFICACION\s*DE\s*SALARIO|ALTA)\s*([\d]{2}\/[\d]{2}\/[\d]{4})\s*\$\s*([\d.]+)/gi;
+                let m;
+                while ((m = movRegex.exec(block)) !== null) {
+                    allSisecMovs.push({
+                        registro: regPatronal,
+                        nombre: name,
+                        tipo: m[1].replace(/\s+/g, ' ').trim().toUpperCase(),
+                        fecha: m[2].trim(),
+                        salario: m[3].trim()
+                    });
+                }
+            });
+
+            const groupedSisec = {};
+            allSisecMovs.forEach(mov => {
+                if (!groupedSisec[mov.registro]) {
+                    groupedSisec[mov.registro] = { nombre: mov.nombre, registro: mov.registro, movimientos: [] };
+                }
+                groupedSisec[mov.registro].movimientos.push(mov);
+            });
+
+            Object.keys(groupedSisec).forEach(reg => {
+                const group = groupedSisec[reg];
+                const movsAsc = group.movimientos.sort((a,b) => parseDateStr(a.fecha) - parseDateStr(b.fecha));
+                
+                let periods = [];
+                let curPer = [];
+                
+                movsAsc.forEach(m => {
+                    if (curPer.length > 0 && curPer[curPer.length - 1].tipo === 'BAJA') {
+                        periods.push(curPer);
+                        curPer = [];
+                    }
+                    curPer.push(m);
+                });
+                if (curPer.length > 0) periods.push(curPer);
+
+                periods.forEach((pMovs, index) => {
+                    pMovs.sort((a,b) => parseDateStr(b.fecha) - parseDateStr(a.fecha)); 
+                    data.employers.push({ 
+                        registro: reg, 
+                        nombre: group.nombre, 
+                        movimientos: pMovs,
+                        periodIndex: index + 1,
+                        totalPeriods: periods.length
+                    });
+                });
+            });
+
+            return data;
+        };
+
+        const processData = () => {
+            if (!rawData.trim() && !rawSisec.trim()) return;
+
+            let finalSindoData = null;
+            let finalSisecData = null;
+            
+            if(rawSisec.trim()) finalSisecData = parseSISEC(rawSisec);
+
+            if(rawData.trim()) {
+            const sections = rawData.split(/--------------------------------------------------------------------------------/);
+            const employers = {};
+            const personal = {};
+            const historyFlat = [];
+
+            sections.forEach(section => {
+                if (section.includes('REGISTRO PATRONAL') || section.includes('REG. PATRONAL')) {
+                const regMatch = section.match(/REG(?:ISTRO)?\.?\s*PATRONAL\s+([A-Z0-9-]{10,15})/i);
+                const nameMatch = section.match(/NOMBRE\n(.+)/);
+                const tMovMatch = section.match(/TIPO DE MOVIMIENTO\s+(\d)/);
+                const fMovMatch = section.match(/FECHA DE MOVIMIENTO\s+(\d{2}\/\d{2}\/\d{4})/);
+                const bajaCausaMatch = section.match(/CAUSA DE BAJA\s+(.*?)(?:\s+S\.S\.F\.|$)/);
+
+                if (regMatch) {
+                    const rawReg = regMatch[1].trim();
+                    const cleanRegKey = rawReg.replace(/[^A-Z0-9]/g, '').substring(0, 10);
+                    
+                    let isBaja = false, bajaDate = null, bajaReason = null;
+                    if (tMovMatch && tMovMatch[1] === '2') {
+                    isBaja = true;
+                    if (fMovMatch) bajaDate = parseDateStr(fMovMatch[1]);
+                    bajaReason = bajaCausaMatch ? bajaCausaMatch[1].trim() : "BAJA (SIN ESPECIFICAR)";
+                    }
+
+                    employers[cleanRegKey] = { 
+                        registroDisplay: rawReg, 
+                        nombre: nameMatch ? nameMatch[1].trim() : 'Patrón Desconocido', 
+                        isBaja, 
+                        bajaDate, 
+                        bajaReason,
+                        isInternalAdjustment: isInternalAdjustment(cleanRegKey)
+                    };
+                }
+                }
+            });
+
+            sections.forEach(section => {
+                if (!personal.nss) {
+                const nssMatch = section.match(/NUM\. SEG\. SOCIAL\s+([\d\s\-]+)/i) || section.match(/NUMERO DE SEG\.SOC\.? :?\s+([\d\s\-]+)/i) || section.match(/NUM[\.\s]+DE[\.\s]+SEG[\.\s]+SOC[\.\s]+([\d\s\-]+?)REGISTRO/i);
+                const curpMatch = section.match(/CURP\.\/RFC\.\s+([A-Z0-9]+)/i) || section.match(/C\.U\.R\.P\s+:\s+([A-Z0-9]+)/i) || section.match(/CURP\s+([A-Z0-9]{18})/i);
+                const nameMatch = section.match(/NOMBRE DEL ASEGURADO\s+(.+)/i) || section.match(/N O M B R E\s+:\s+(.+)/i);
+                
+                if (nssMatch) personal.nss = nssMatch[1].trim();
+                if (curpMatch) personal.curp = curpMatch[1].trim();
+                if (nameMatch) personal.nombre = nameMatch[1].trim();
+                }
+
+                if (section.includes('SB03M') && section.includes('---------INICIO----------')) {
+                const lines = section.split('\n');
+                lines.forEach(line => {
+                    const rowMatch = line.match(/^(\d{2})\s+([A-Z0-9]{10,12})\s+([\d/]{10})\s+(\d)\s+(\d)\s+([\d/]{10})\s+([\d.]+)\s+([FMV])\s+(\d)\s+(SI|NO)\s+(SI|NO)\s+(\d)\s+(\d)\s+([\d/]{10})?/);
+                    if (rowMatch) {
+                    historyFlat.push({
+                        delegacion: rowMatch[1], regPat: rowMatch[2], fRecep: rowMatch[3], origenIni: rowMatch[4], tipoIni: rowMatch[5], fMov: rowMatch[6], salario: rowMatch[7], origenFin: rowMatch[12], tipoFin: rowMatch[13], fBaja: rowMatch[14]
+                    });
+                    }
+                });
+                }
+            });
+
+            const groupedMap = {};
+            
+            historyFlat.forEach(mov => {
+                const key = mov.regPat.substring(0, 10);
+                if (!groupedMap[key]) {
+                groupedMap[key] = { info: employers[key] || { nombre: 'Patrón sin datos SP01M', registroDisplay: mov.regPat, isBaja: false, isInternalAdjustment: isInternalAdjustment(key) }, movements: [] };
+                }
+                groupedMap[key].movements.push(mov);
+            });
+
+            const finalGroupedArray = [];
+            
+            Object.keys(groupedMap).forEach(key => {
+                const group = groupedMap[key];
+                const movsAsc = group.movements.sort((a,b) => parseDateStr(a.fMov) - parseDateStr(b.fMov));
+                
+                let periods = [];
+                let curPer = [];
+                
+                movsAsc.forEach(m => {
+                    if (curPer.length > 0 && curPer[curPer.length - 1].tipoFin === '2') {
+                        periods.push(curPer);
+                        curPer = [];
+                    }
+                    curPer.push(m);
+                });
+                if (curPer.length > 0) periods.push(curPer);
+
+                periods.forEach((pMovs, index) => {
+                    pMovs.sort((a,b) => parseDateStr(b.fMov) - parseDateStr(a.fMov)); 
+                    
+                    const pInfo = { ...group.info };
+                    pInfo.periodIndex = index + 1;
+                    pInfo.totalPeriods = periods.length;
+                    pInfo.previousPeriodsCount = index;
+                    
+                    const lastMov = pMovs[0];
+                    pInfo.isPeriodClosed = lastMov && lastMov.tipoFin === '2';
+                    
+                    finalGroupedArray.push({
+                        info: pInfo,
+                        movements: pMovs,
+                        regPatKey: key
+                    });
+                });
+            });
+
+            finalGroupedArray.sort((a, b) => {
+                const dA = a.movements[0] ? parseDateStr(a.movements[0].fMov) : new Date(0);
+                const dB = b.movements[0] ? parseDateStr(b.movements[0].fMov) : new Date(0);
+                return dB - dA;
+            });
+
+            const stats = { counts: { '5': 0, '6': 0, '7': 0, '8': 0, '9': 0 }, riskEvents: [], lateEvents: [], bajaCompanies: [], suspiciousDates: [], totalRisks: 0, bajaConflicts: 0 };
+
+            finalGroupedArray.forEach(group => {
+                const isMod40 = group.info.nombre.toUpperCase().includes('CONTINUACION VOLUNTARIA');
+                const empNameWithPeriod = group.info.totalPeriods > 1 ? `${group.info.nombre} (Periodo ${group.info.periodIndex})` : group.info.nombre;
+
+                group.movements.forEach(mov => {
+                const lateInfo = getLateSubmissionInfo(mov.fRecep, mov.fMov);
+                mov.lateInfo = lateInfo;
+
+                if (isMod40 && lateInfo.isLate && lateInfo.diffDays > 45) {
+                    mov.isMod40Retro = true;
+                    lateInfo.isMod40Retro = true;
+                    lateInfo.label = 'M40 RETROACTIVA';
+                    lateInfo.badgeClass = 'bg-[#D4AF37] border-[#B8962E] text-[#003366] font-black shadow-md print:bg-white print:border-[#003366] print:text-[#003366]';
+                }
+
+                if (lateInfo.isLate) {
+                    stats.lateEvents.push({ 
+                        empresa: empNameWithPeriod, 
+                        fechaMov: mov.fMov, 
+                        fechaRecep: mov.fRecep, 
+                        diffDays: lateInfo.diffDays, 
+                        level: lateInfo.level, 
+                        label: lateInfo.label, 
+                        badgeClass: lateInfo.badgeClass, 
+                        colorClass: lateInfo.colorClass, 
+                        tipo: TIPO_MAP[mov.tipoIni] || 'Movimiento', 
+                        isMod40Retro: lateInfo.isMod40Retro,
+                        obs: lateInfo.obs,
+                        isJustified: lateInfo.isJustified
+                    });
+                }
+
+                if (mov.fRecep === '00/00/0000') {
+                    stats.totalRisks++;
+                    stats.suspiciousDates.push({ 
+                        empresa: empNameWithPeriod, 
+                        fecha: mov.fMov, 
+                        origen: mov.origenIni || '0', 
+                        tipo: mov.tipoIni, 
+                        desc: 'Fecha 00/00/0000 (Registro Sospechoso)' 
+                    });
+                }
+
+                if (isRiskOrigin(mov.origenIni)) {
+                    stats.counts[mov.origenIni] = (stats.counts[mov.origenIni] || 0) + 1;
+                    stats.totalRisks++;
+                    stats.riskEvents.push({ empresa: empNameWithPeriod, fecha: mov.fMov, origen: mov.origenIni, tipo: mov.tipoIni, etapa: 'INICIO', desc: TIPO_MAP[mov.tipoIni] || 'Desconocido' });
+                }
+                if (isRiskOrigin(mov.origenFin)) {
+                    stats.counts[mov.origenFin] = (stats.counts[mov.origenFin] || 0) + 1;
+                    stats.totalRisks++;
+                    stats.riskEvents.push({ empresa: empNameWithPeriod, fecha: mov.fBaja || mov.fMov, origen: mov.origenFin, tipo: mov.tipoFin, etapa: 'CIERRE', desc: TIPO_MAP[mov.tipoFin] || 'Desconocido' });
+                }
+                });
+            });
+
+            Object.keys(employers).forEach(key => {
+                const emp = employers[key];
+                if (emp.isBaja) {
+                    const movs = historyFlat.filter(m => m.regPat.substring(0,10) === key);
+                    let hasPostBajaMovements = false;
+                    let workerBajaDateStr = 'Sin registro explícito';
+                    let maxBaja = null;
+                    
+                    movs.forEach(mov => {
+                        if (emp.bajaDate && parseDateStr(mov.fMov) > emp.bajaDate) hasPostBajaMovements = true;
+                        if (mov.fBaja && emp.bajaDate && parseDateStr(mov.fBaja) > emp.bajaDate) hasPostBajaMovements = true;
+                        if (mov.tipoFin === '2' || mov.tipoIni === '2') {
+                            const d = parseDateStr(mov.fBaja || mov.fMov);
+                            if (!maxBaja || d > maxBaja) {
+                                maxBaja = d;
+                                workerBajaDateStr = mov.fBaja || mov.fMov;
+                            }
+                        }
+                    });
+                    
+                    stats.bajaCompanies.push({
+                        nombre: emp.nombre,
+                        razon: emp.bajaReason || 'BAJA SIN ESPECIFICAR',
+                        fecha: emp.bajaDate,
+                        workerBajaDateStr,
+                        hasPostBajaMovements
+                    });
+                }
+            });
+
+            stats.riskEvents.sort((a, b) => parseDateStr(b.fecha) - parseDateStr(a.fecha));
+            stats.lateEvents.sort((a, b) => b.diffDays - a.diffDays);
+            finalSindoData = { personal, grouped: finalGroupedArray, stats };
+            }
+
+            let finalCruce = null;
+            if(finalSindoData && finalSisecData) {
+            finalCruce = { alertas: [], patronesComparados: [] };
+            
+            if (finalSindoData.personal.nss && finalSisecData.personal.nss) {
+                const cleanSindoNSS = finalSindoData.personal.nss.replace(/[^0-9]/g, '').substring(0, 11);
+                const cleanSisecNSS = finalSisecData.personal.nss.replace(/[^0-9]/g, '').substring(0, 11);
+                if (cleanSindoNSS && cleanSisecNSS && cleanSindoNSS !== cleanSisecNSS) {
+                    finalCruce.alertas.push({ tipo: 'CRITICO', msj: `¡DISCREPANCIA DE IDENTIDAD! El NSS en SINDO (${cleanSindoNSS}) no coincide con el NSS en SISEC (${cleanSisecNSS}).` });
+                }
+            }
+
+            const sindoRegs = finalSindoData.grouped.map(g => g.regPatKey);
+            const sisecRegs = finalSisecData.employers.map(e => e.registro);
+            const allRegs = new Set([...sindoRegs, ...sisecRegs]);
+            
+            allRegs.forEach(reg => {
+                const sGroups = finalSindoData.grouped.filter(g => g.regPatKey === reg);
+                const sEmps = finalSisecData.employers.filter(e => e.registro === reg);
+                
+                const baseNombre = sGroups[0]?.info.nombre || sEmps[0]?.nombre || 'DESCONOCIDO';
+                const hasMultiplePeriods = sGroups.length > 1 || sEmps.length > 1;
+                const maxPeriodsCount = Math.max(sGroups.length, sEmps.length);
+                
+                const comp = { 
+                    registro: reg, 
+                    nombre: baseNombre,
+                    hasMultiplePeriods,
+                    maxPeriodsCount,
+                    isInternalAdjustment: isInternalAdjustment(reg),
+                    status: 'OK', 
+                    detalles: [], 
+                    movimientosCruzados: [] 
+                };
+                
+                let sisecMovsStd = [];
+                sEmps.forEach(sEmp => {
+                    sEmp.movimientos.forEach(m => {
+                        const bucket = m.tipo === 'BAJA' ? 'BAJA' : 'INICIO_MODIF';
+                        sisecMovsStd.push({ bucket, tipoOriginal: m.tipo, fecha: m.fecha, salario: parseFloat(m.salario.replace(/[^0-9.]/g, '')) });
+                    });
+                });
+                
+                let sindoMovsStd = [];
+                sGroups.forEach(sGroup => {
+                    sGroup.movements.forEach(m => {
+                        const sal = parseFloat(m.salario);
+                        const tipoOrig = m.tipoIni === '8' ? 'REINGRESO' : (m.tipoIni === '1' ? 'ALTA' : 'MODIFICACIÓN');
+                        const riskIni = isRiskOrigin(m.origenIni);
+                        
+                        sindoMovsStd.push({ 
+                            bucket: 'INICIO_MODIF', 
+                            tipoOriginal: tipoOrig, 
+                            fecha: m.fMov, 
+                            salario: sal,
+                            origen: m.origenIni,
+                            tipoCod: m.tipoIni,
+                            isRisk: riskIni
+                        });
+                        
+                        if (m.tipoFin === '2') {
+                            const riskFin = isRiskOrigin(m.origenFin);
+                            sindoMovsStd.push({ 
+                                bucket: 'BAJA', 
+                                tipoOriginal: 'BAJA', 
+                                fecha: m.fBaja || m.fMov, 
+                                salario: sal,
+                                origen: m.origenFin,
+                                tipoCod: m.tipoFin,
+                                isRisk: riskFin
+                            });
+                        }
+                    });
+                });
+
+                const cruceMovs = [];
+                ['INICIO_MODIF', 'BAJA'].forEach(bucket => {
+                    let sList = sisecMovsStd.filter(m => m.bucket === bucket);
+                    let dList = sindoMovsStd.filter(m => m.bucket === bucket);
+
+                    sList.forEach(sm => {
+                        let dIndex = dList.findIndex(dm => dm.fecha === sm.fecha);
+                        if (dIndex >= 0) {
+                            let dm = dList[dIndex];
+                            let matchSalario = Math.abs(sm.salario - dm.salario) < 0.05;
+                            cruceMovs.push({ tipoClasif: bucket === 'BAJA' ? 'BAJA' : 'ALTA/MODIF', sisec: sm, sindo: dm, status: matchSalario ? 'MATCH' : 'MISMATCH_SALARIO' });
+                            dList.splice(dIndex, 1);
+                        } else cruceMovs.push({ tipoClasif: bucket === 'BAJA' ? 'BAJA' : 'ALTA/MODIF', sisec: sm, sindo: null, status: 'ONLY_SISEC' });
+                    });
+                    dList.forEach(dm => cruceMovs.push({ tipoClasif: bucket === 'BAJA' ? 'BAJA' : 'ALTA/MODIF', sisec: null, sindo: dm, status: 'ONLY_SINDO' }));
+                });
+
+                cruceMovs.sort((a,b) => (parseDateStr(b.sisec ? b.sisec.fecha : b.sindo.fecha)?.getTime() || 0) - (parseDateStr(a.sisec ? a.sisec.fecha : a.sindo.fecha)?.getTime() || 0));
+                comp.movimientosCruzados = cruceMovs;
+
+                if (sGroups.length > 0 && sEmps.length === 0) {
+                    comp.status = 'ALERTA'; comp.detalles.push({ tipo: 'FALTANTE', desc: 'Esta empresa aparece en el historial SINDO pero NO en el SISEC.' });
+                } else if (sGroups.length === 0 && sEmps.length > 0) {
+                    comp.status = 'ALERTA'; comp.detalles.push({ tipo: 'FALTANTE', desc: 'Esta empresa aparece en SISEC pero NO en el historial del SINDO.' });
+                } else {
+                    if (cruceMovs.some(m => m.status !== 'MATCH') && comp.status === 'OK') comp.status = 'ALERTA';
+                    
+                    if (sindoMovsStd.length !== sisecMovsStd.length) {
+                        comp.detalles.push({ tipo: 'INFO', desc: `Discrepancia de volumen: SINDO reporta ${sindoMovsStd.length} movimiento(s) lógico(s) y SISEC registra ${sisecMovsStd.length} fila(s).` });
+                    }
+                }
+                finalCruce.patronesComparados.push(comp);
+            });
+            
+            finalCruce.patronesComparados.sort((a,b) => {
+                const dateA = a.movimientosCruzados[0] ? parseDateStr(a.movimientosCruzados[0].sisec?.fecha || a.movimientosCruzados[0].sindo?.fecha) : new Date(0);
+                const dateB = b.movimientosCruzados[0] ? parseDateStr(b.movimientosCruzados[0].sisec?.fecha || b.movimientosCruzados[0].sindo?.fecha) : new Date(0);
+                return dateB - dateA;
+            });
+            }
+
+            setParsedData(finalSindoData); setSisecData(finalSisecData); setCruceData(finalCruce);
+            if (finalSindoData && !finalSisecData) setActiveTab('sindo');
+            if (finalCruce) setActiveTab('cruce');
+        };
+
+        const handleAuthSubmit = (e) => {
+            e.preventDefault();
+            const now = new Date();
+            const oneMinAgo = new Date(now.getTime() - 60000); // 1 minuto de tolerancia
+
+            const getExpectedPins = (d) => {
+                let h12 = d.getHours() % 12;
+                h12 = h12 ? h12 : 12;
+                const strH12 = h12.toString().padStart(2, '0');
+                const strH24 = d.getHours().toString().padStart(2, '0');
+                const strM = d.getMinutes().toString().padStart(2, '0');
+                return [strH12 + strM, strH24 + strM]; // Genera PIN en 12h y 24h
+            };
+
+            const validPins = [...getExpectedPins(now), ...getExpectedPins(oneMinAgo)];
+
+            if (validPins.includes(sindoPassword)) {
+                setShowSindoAuth(false);
+                setSindoPassword('');
+                setSindoAuthError(false);
+                setCurrentModule('sindo');
+            } else {
+                setSindoAuthError(true);
+            }
+        };
+
+        if (currentModule === 'menu') {
+            return (
+            <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center font-sans p-6 relative">
+                
+                {/* --- MODAL DE SEGURIDAD PIN --- */}
+                {showSindoAuth && (
+                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative">
+                            <button onClick={() => { setShowSindoAuth(false); setSindoAuthError(false); setSindoPassword(''); }} className="absolute top-5 right-5 text-slate-400 hover:text-[#003366] transition-colors">
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                            <div className="flex justify-center mb-6">
+                                <div className="bg-[#003366]/10 p-5 rounded-2xl">
+                                    <ShieldCheck className="w-10 h-10 text-[#003366]" />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-black text-center text-[#003366] mb-2 uppercase tracking-wide">Acceso Protegido</h3>
+                            <p className="text-sm text-center text-slate-500 mb-6">Ingrese el PIN de seguridad (Hora Actual en formato HHMM) para acceder.</p>
+                            <form onSubmit={handleAuthSubmit}>
+                                <input
+                                    type="password"
+                                    maxLength="4"
+                                    className={"w-full text-center text-3xl tracking-[0.5em] font-mono p-4 rounded-xl border-2 outline-none transition-colors " + (sindoAuthError ? "border-rose-500 bg-rose-50 text-rose-700" : "border-slate-200 focus:border-[#003366] bg-slate-50")}
+                                    value={sindoPassword}
+                                    onChange={(e) => { setSindoPassword(e.target.value.replace(/[^0-9]/g, '')); setSindoAuthError(false); }}
+                                    autoFocus
+                                    placeholder="----"
+                                />
+                                {sindoAuthError && <p className="text-rose-500 text-xs font-bold text-center mt-3 uppercase tracking-widest flex items-center justify-center gap-1"><AlertTriangle className="w-3 h-3"/> PIN Incorrecto</p>}
+                                <button type="submit" className="w-full mt-6 bg-[#003366] text-white font-black uppercase tracking-widest py-4 rounded-xl hover:bg-[#002244] transition-all shadow-lg hover:shadow-[#003366]/30 hover:-translate-y-1">
+                                    Desbloquear
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                <div className="max-w-5xl w-full">
+                <div className="text-center mb-16">
+                    <h1 className="text-4xl md:text-5xl font-black text-[#003366] tracking-tighter uppercase mb-4">RGC Pensiones y Seguros</h1>
+                    <p className="text-[#D4AF37] font-black tracking-widest uppercase text-lg">Portal de Herramientas Internas</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <button 
+                    onClick={() => setShowSindoAuth(true)} 
+                    className="group bg-white rounded-3xl p-8 shadow-xl border-b-[8px] border-[#003366] hover:-translate-y-2 hover:shadow-2xl transition-all text-left flex flex-col h-full"
+                    >
+                    <div className="bg-[#003366]/10 p-5 rounded-2xl w-fit mb-6 group-hover:bg-[#003366] transition-colors">
+                        <ShieldCheck className="w-10 h-10 text-[#003366] group-hover:text-white transition-colors" />
+                    </div>
+                    <h2 className="text-2xl font-black text-[#003366] mb-3 uppercase tracking-wide">Visor SINDO Integral</h2>
+                    <p className="text-slate-500 font-medium flex-1 text-sm leading-relaxed">Analizador avanzado de reportes SINDO, detección de orígenes de riesgo (5-9), auditoría de bajas patronales y cruce exhaustivo con constancias SISEC.</p>
+                    <div className="mt-8 flex items-center gap-2 text-[#D4AF37] font-black uppercase tracking-widest text-sm">
+                        Abrir Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                    </div>
+                    </button>
+
+                    <button 
+                    onClick={() => setCurrentModule('pension')} 
+                    className="group bg-white rounded-3xl p-8 shadow-xl border-b-[8px] border-[#D4AF37] hover:-translate-y-2 hover:shadow-2xl transition-all text-left flex flex-col h-full"
+                    >
+                    <div className="bg-[#D4AF37]/10 p-5 rounded-2xl w-fit mb-6 group-hover:bg-[#D4AF37] transition-colors">
+                        <Calculator className="w-10 h-10 text-[#D4AF37] group-hover:text-[#003366] transition-colors" />
+                    </div>
+                    <h2 className="text-2xl font-black text-[#003366] mb-3 uppercase tracking-wide">Cálculo de Pensión</h2>
+                    <p className="text-slate-500 font-medium flex-1 text-sm leading-relaxed">Proyección financiera para Ley 73, simulador de inversión en Modalidad 40, cálculo de promedios salariales e integración inteligente de semanas cotizadas.</p>
+                    <div className="mt-8 flex items-center gap-2 text-[#D4AF37] font-black uppercase tracking-widest text-sm">
+                        Abrir Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                    </div>
+                    </button>
+                </div>
+                </div>
+            </div>
+            );
+        }
+
+        if (currentModule === 'pension') {
+            return (
+            <div className="min-h-screen bg-slate-100 p-4 font-sans text-slate-900">
+                <div className="max-w-[1400px] mx-auto">
+                <header className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-4">
+                        <button 
+                        onClick={() => setCurrentModule('menu')} 
+                        className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-[#003366] hover:text-white transition-colors text-[#003366]"
+                        title="Volver al Menú Principal"
+                        >
+                        <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <div className="bg-[#D4AF37] p-3 rounded-xl shadow-lg shadow-[#D4AF37]/30">
+                        <Calculator className="w-8 h-8 text-[#003366]" />
+                        </div>
+                        <div>
+                        <h1 className="text-2xl font-black text-[#003366] tracking-tight">CÁLCULO DE PENSIÓN</h1>
+                        <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest mt-1">Simulador y Proyecciones</p>
+                        </div>
+                    </div>
+                </header>
+                
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-2">
+                    <ModuloPension />
+                </div>
+                </div>
+            </div>
+            );
+        }
+
+        return (
+            <div className="min-h-screen bg-slate-50 p-4 font-sans text-slate-900 print:p-0 print:bg-white">
+            
+            <div id="informe-auditoria" className={`max-w-6xl mx-auto space-y-6 print:space-y-4 ${isGeneratingPDF ? 'pdf-mode' : ''}`}>
+
+                <div className="hidden print:block print:min-h-screen">
+                <div className="flex flex-col items-center justify-center border-b-[8px] border-[#D4AF37] pb-8 mb-8 mt-12 text-center">
+                    <h1 className="text-5xl font-black text-[#003366] tracking-tighter uppercase mb-2">RGC Pensiones y Seguros</h1>
+                    <p className="text-[#D4AF37] font-black tracking-widest uppercase text-lg">Dictamen Técnico de Auditoría en Seguridad Social</p>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 p-8 rounded-2xl mb-12 shadow-sm">
+                    <h2 className="text-[#003366] text-xl font-black uppercase mb-6 border-b-2 border-slate-200 pb-2 flex items-center gap-2"><Users className="w-5 h-5"/> Información del Asegurado</h2>
+                    <div className="grid grid-cols-2 gap-y-6 gap-x-8 text-sm">
+                        <div><span className="font-bold text-slate-400 block text-xs uppercase tracking-widest mb-1">Nombre Completo</span> <span className="text-xl font-black text-[#003366]">{parsedData?.personal?.nombre || sisecData?.personal?.nombre || 'N/A'}</span></div>
+                        <div><span className="font-bold text-slate-400 block text-xs uppercase tracking-widest mb-1">Fecha de Emisión del Dictamen</span> <span className="text-lg font-mono text-slate-700">{new Date().toLocaleDateString('es-MX')}</span></div>
+                        <div><span className="font-bold text-slate-400 block text-xs uppercase tracking-widest mb-1">Número de Seguridad Social (NSS)</span> <span className="font-mono text-lg text-slate-700">{parsedData?.personal?.nss || sisecData?.personal?.nss}</span></div>
+                        <div><span className="font-bold text-slate-400 block text-xs uppercase tracking-widest mb-1">Semanas Cotizadas (SISEC)</span> <span className="font-mono text-lg text-slate-700">{sisecData?.totalSemanas || 'No analizado'}</span></div>
+                    </div>
+                </div>
+
+                <div className="mb-12 page-break">
+                    <h2 className="text-[#003366] text-xl font-black uppercase mb-4 border-b-2 border-slate-200 pb-2 flex items-center gap-2"><BookOpen className="w-5 h-5"/> Glosario de Términos (Guía para el Cliente)</h2>
+                    <p className="text-sm text-slate-600 mb-6 italic">Para facilitar la lectura de este dictamen, le explicamos brevemente los conceptos clave que encontrará en las siguientes tablas:</p>
+                    
+                    <div className="space-y-6 text-sm text-slate-700">
+                        <div>
+                            <h4 className="font-black text-[#003366] text-base mb-1">1. Los Sistemas Analizados</h4>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li><b>SINDO (Sistema Integral de Derechos y Obligaciones):</b> Base de datos interna y detallada del IMSS. Permite ver exactamente <i>cuándo</i> y <i>cómo</i> su expatrón reportó movimientos.</li>
+                                <li><b>SISEC (Sistema de Semanas Cotizadas):</b> Reporte público que usted descarga. Ocasionalmente, no coincide con la realidad interna del SINDO.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-black text-[#003366] text-base mb-1">2. Tipos de Movimientos (Claves IMSS)</h4>
+                            <p className="mb-2">El IMSS cataloga lo que ocurre en su historial con números. Los más importantes son:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                                <li><span className="font-bold text-emerald-700 bg-emerald-50 px-1 rounded">Tipo 8 / Tipo 1:</span> Alta o Reingreso laboral.</li>
+                                <li><span className="font-bold text-rose-700 bg-rose-50 px-1 rounded">Tipo 2:</span> Baja de la empresa.</li>
+                                <li><span className="font-bold text-[#003366] bg-[#003366]/10 px-1 rounded">Tipo 7:</span> Modificación salarial.</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-black text-[#D4AF37] text-base mb-1">3. Orígenes de Movimiento (Focos de Auditoría)</h4>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li><b>Orígenes 0 al 4 (Normales):</b> Trámites ordinarios realizados correctamente por el patrón a través de internet (IDSE) o ventanilla.</li>
+                                <li><span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded">Orígenes 5 al 9 (CRÍTICOS):</span> Movimiento <b>NO</b> realizado por el patrón. Producto de <b>Auditorías del IMSS (SIREM/SIVEPA)</b>, multas, o correcciones forzadas.</li>
+                            </ul>
+                        </div>
+                        <div className="bg-rose-50 border border-rose-200 p-5 rounded-xl mt-4">
+                            <h4 className="font-black text-rose-800 text-sm mb-2 flex items-center gap-2"><Siren className="w-5 h-5"/> ¿Qué es una Baja por Artículo 251?</h4>
+                            <p className="text-sm text-rose-700">Significa que el IMSS detectó que la empresa es "fantasma", inoperante o incumplida, y el propio instituto le canceló el registro. Cualquier semana cotizada bajo este supuesto está en alto riesgo de ser anulada para su pensión.</p>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <header className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 print:hidden">
+                <div className="flex items-center gap-4">
+                    <button 
+                    onClick={() => setCurrentModule('menu')} 
+                    className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-[#003366] hover:text-white transition-colors text-[#003366]"
+                    title="Volver al Menú Principal"
+                    >
+                    <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <div className="bg-[#003366] p-3 rounded-xl shadow-lg shadow-[#003366]/30">
+                    <ShieldCheck className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                    <h1 className="text-2xl font-black text-[#003366] tracking-tight">VISOR INTEGRAL</h1>
+                    <p className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest mt-1">Sindo + Sisec</p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    <button 
+                    onClick={loadExampleData} 
+                    className="px-4 py-2.5 text-[11px] font-black text-[#003366] bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors uppercase tracking-widest flex items-center gap-2"
+                    >
+                    <FileText className="w-4 h-4" /> Cargar Ejemplo
+                    </button>
+                    <button 
+                    onClick={() => { setRawData(''); setRawSisec(''); setParsedData(null); setSisecData(null); setCruceData(null); setIsSisecEnabled(false); }} 
+                    className="px-4 py-2.5 text-[11px] font-black text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-widest"
+                    >
+                    Limpiar
+                    </button>
+                    <button 
+                    id="btn-procesar"
+                    onClick={processData} 
+                    className="px-6 py-2.5 text-[11px] font-black text-white bg-[#003366] rounded-xl hover:bg-[#002244] shadow-lg shadow-[#003366]/20 transition-all flex items-center gap-2 uppercase tracking-widest"
+                    >
+                    {isSisecEnabled ? <GitMerge className="w-4 h-4 text-[#D4AF37]" /> : <Search className="w-4 h-4 text-[#D4AF37]" />}
+                    {isSisecEnabled ? "Cruzar Datos" : "Analizar SINDO"}
+                    </button>
+                </div>
+                </header>
+
+                {!parsedData && !sisecData ? (
+                <div className="flex flex-col gap-4 print:hidden">
+                    <div className="flex justify-end">
+                    {!isSisecEnabled && (
+                        <button onClick={() => setIsSisecEnabled(true)} className="text-[11px] font-black uppercase tracking-widest text-[#003366] flex items-center gap-1 hover:text-[#D4AF37] transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+                        + Activar Cruce SISEC (Opcional)
+                        </button>
+                    )}
+                    </div>
+                    <div className={`grid grid-cols-1 ${isSisecEnabled ? 'md:grid-cols-2' : ''} gap-4 h-[600px]`}>
+                        <div className="flex flex-col bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 bg-[#003366] text-white flex items-center gap-3 border-b-4 border-[#D4AF37]">
+                                <LayoutGrid className="w-5 h-5 text-[#D4AF37]" />
+                                <span className="text-sm font-black uppercase tracking-widest">1. Pegar Reporte SINDO Completo</span>
+                            </div>
+                            <textarea
+                                className="flex-1 w-full p-6 font-mono text-xs focus:ring-0 focus:outline-none resize-none bg-slate-50 text-slate-600 leading-relaxed"
+                                placeholder="Pegue aquí todo el contenido del reporte SINDO..."
+                                value={rawData}
+                                onChange={(e) => setRawData(e.target.value)}
+                            />
+                        </div>
+                        {isSisecEnabled && (
+                            <div className="flex flex-col bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="p-5 bg-[#D4AF37] text-[#003366] flex items-center justify-between border-b-4 border-[#003366]">
+                                    <div className="flex items-center gap-3">
+                                        <FileText className="w-5 h-5 text-[#003366]" />
+                                        <span className="text-sm font-black uppercase tracking-widest">2. Pegar Constancia SISEC</span>
+                                    </div>
+                                    <button onClick={() => { setIsSisecEnabled(false); setRawSisec(''); }} className="text-[#003366] hover:text-white transition-colors" title="Ocultar SISEC">
+                                        <XCircle className="w-6 h-6" />
+                                    </button>
+                                </div>
+                                <textarea
+                                    className="flex-1 w-full p-6 font-mono text-xs focus:ring-0 focus:outline-none resize-none bg-[#fffdf0] text-slate-600 leading-relaxed"
+                                    placeholder="Pegue aquí el texto copiado del PDF Constancia de Semanas Cotizadas..."
+                                    value={rawSisec}
+                                    onChange={(e) => setRawSisec(e.target.value)}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+                ) : (
+                <div className="space-y-6 print:space-y-6">
+                    
+                    <div className="flex flex-wrap justify-between items-center gap-4 print:hidden bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                        
+                        <div className="flex gap-2">
+                            {parsedData && (
+                                <button onClick={() => setActiveTab('sindo')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors ${activeTab === 'sindo' ? 'bg-[#003366] text-white shadow-md' : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
+                                    Análisis SINDO
+                                </button>
+                            )}
+                            {cruceData && (
+                                <button onClick={() => setActiveTab('cruce')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 ${activeTab === 'cruce' ? 'bg-[#D4AF37] text-[#003366] shadow-md' : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}>
+                                    <GitMerge className="w-4 h-4" /> Cruce SISEC
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 items-center">
+                            <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                                <button 
+                                    onClick={() => setViewMode('cliente')} 
+                                    className={`px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1 ${viewMode === 'cliente' ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-400'}`}
+                                >
+                                    <Eye className="w-3 h-3" /> Cliente
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('auditor')} 
+                                    className={`px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1 ${viewMode === 'auditor' ? 'bg-[#003366] text-white shadow-sm' : 'text-slate-400'}`}
+                                >
+                                    <LayoutGrid className="w-3 h-3" /> Auditor (Técnico)
+                                </button>
+                            </div>
+
+                            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+
+                            {cruceData && (
+                                <button 
+                                onClick={handleDownloadCSV}
+                                className="px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-emerald-700 hover:bg-emerald-50 transition-colors flex items-center gap-2"
+                                >
+                                    <FileSpreadsheet className="w-4 h-4" /> Excel
+                                </button>
+                            )}
+
+                            <div className="flex gap-2 relative group">
+                                <button 
+                                onClick={triggerNativePrint} 
+                                className="px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                                title="Imprimir o Guardar como PDF (Nativo)"
+                                >
+                                    <Printer className="w-4 h-4" /> Imprimir
+                                </button>
+                                <button 
+                                onClick={handleDownloadPDF} 
+                                disabled={isGeneratingPDF}
+                                className="px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#003366] hover:bg-black transition-colors flex items-center gap-2 shadow-md disabled:opacity-50"
+                                >
+                                    <Download className={`w-4 h-4 ${isGeneratingPDF ? 'animate-bounce' : ''} text-[#D4AF37]`} /> 
+                                    {isGeneratingPDF ? "Generando..." : "Descargar PDF"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-[#003366] rounded-3xl p-8 shadow-xl flex flex-wrap items-center justify-between gap-6 text-white border-l-[8px] border-[#D4AF37] print:hidden">
+                    <div className="flex items-center gap-6">
+                        <div className="bg-white/10 p-5 rounded-2xl backdrop-blur-sm border border-white/10">
+                            <Users className="w-10 h-10 text-[#D4AF37]" />
+                        </div>
+                        <div>
+                            <h2 className="text-3xl font-black mb-2 tracking-tight">{parsedData?.personal?.nombre || sisecData?.personal?.nombre || 'DESCONOCIDO'}</h2>
+                            <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm font-mono text-slate-300">
+                            <span className="flex items-center gap-2"><span className="opacity-70 font-sans font-bold uppercase text-[10px] tracking-widest">NSS:</span> {parsedData?.personal?.nss || sisecData?.personal?.nss}</span>
+                            <span className="flex items-center gap-2"><span className="opacity-70 font-sans font-bold uppercase text-[10px] tracking-widest">CURP:</span> {parsedData?.personal?.curp || sisecData?.personal?.curp}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {sisecData?.totalSemanas > 0 && (
+                        <div className="text-right border-l border-white/20 pl-8">
+                            <p className="text-xs uppercase tracking-widest text-[#D4AF37] font-bold mb-1">Semanas SISEC</p>
+                            <p className="text-4xl font-black">{sisecData.totalSemanas}</p>
+                        </div>
+                    )}
+                    </div>
+
+                    {parsedData && (
+                        <div className={`tab-content ${activeTab === 'sindo' ? 'block' : 'hidden'} print:mb-12 page-break`}>
+                            
+                            <div className="flex items-center gap-3 mb-6 mt-8 print:mt-0 hidden print:flex">
+                                <div className="bg-[#003366] p-2 rounded-lg print-bg-blue"><Briefcase className="w-6 h-6 text-[#D4AF37] print-text-gold" /></div>
+                                <h3 className="text-xl font-black text-[#003366] uppercase tracking-widest border-b-2 border-[#D4AF37] pb-1 w-full print-text-blue">1. Historial y Análisis SINDO</h3>
+                            </div>
+
+                            <div className="grid gap-6 avoid-break">
+                                {parsedData.grouped.map((group, idx) => (
+                                    <div key={idx} className={`bg-white rounded-3xl shadow-sm border overflow-hidden avoid-break print:shadow-none ${group.info.isBaja ? 'border-rose-200 ring-1 ring-rose-50 print-border' : 'border-slate-200 print-border'}`}>
+                                    
+                                    <div className={`p-5 border-b flex flex-wrap justify-between items-center gap-4 ${group.info.isBaja ? 'bg-rose-50/30 print:bg-white' : 'bg-slate-50/50 print:bg-slate-50'}`}>
+                                        <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm print:shadow-none ${group.info.isBaja ? 'bg-white border-rose-200' : 'bg-white border-slate-200'}`}>
+                                            {group.info.isBaja ? <Ban className="w-5 h-5 text-rose-500" /> : <Briefcase className="w-5 h-5 text-[#003366] print-text-blue" />}
+                                        </div>
+                                        <div>
+                                            <h3 className={`text-base font-black uppercase tracking-wide ${group.info.isBaja ? 'text-rose-700' : 'text-[#003366] print-text-blue'} flex items-center gap-2`}>
+                                                {group.info.nombre}
+                                                {group.info.totalPeriods > 1 && <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">P{group.info.periodIndex}/{group.info.totalPeriods}</span>}
+                                            </h3>
+                                            <div className="flex flex-wrap items-center gap-3 mt-1">
+                                                <p className="text-[11px] font-mono text-slate-500 font-bold bg-white px-2 py-0.5 rounded border border-slate-200">REG: {group.info.registroDisplay}</p>
+                                                
+                                                {group.info.isInternalAdjustment && (
+                                                    <span className="text-[10px] bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest flex items-center gap-1 print:bg-white print:border-indigo-400">
+                                                        <ShieldCheck className="w-3 h-3" />
+                                                        Ajuste Interno IMSS
+                                                    </span>
+                                                )}
+
+                                                {group.info.isBaja && (
+                                                <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-md font-bold uppercase tracking-widest shadow-sm flex items-center gap-1 print:border print:border-rose-600 print:text-rose-600 print:bg-white">
+                                                    <XCircle className="w-3 h-3" />
+                                                    {group.info.bajaReason} ({formatDate(group.info.bajaDate)})
+                                                </span>
+                                                )}
+                                            </div>
+                                            {group.info.previousPeriodsCount > 0 && (
+                                                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black tracking-widest uppercase">
+                                                    <History className="w-3.5 h-3.5" /> Reingreso: Trabajó aquí en {group.info.previousPeriodsCount} periodo(s) anterior(es)
+                                                </div>
+                                            )}
+                                        </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left min-w-[900px] print:min-w-full">
+                                        <thead>
+                                            <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-100 bg-slate-50/30 print:border-slate-300 print:bg-slate-50">
+                                            <th className="px-6 py-4 font-black w-[15%]">Fecha Efectiva</th>
+                                            <th className="px-6 py-4 font-black w-[35%]">Movimiento (Inicio)</th>
+                                            <th className="px-6 py-4 font-black w-[15%] text-right">Salario</th>
+                                            <th className="px-6 py-4 font-black w-[35%] pl-8">Cierre / Baja</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 print:divide-slate-200">
+                                            {group.movements.map((mov, mIdx) => {
+                                            const isReingreso = mov.tipoIni === '8' || mov.tipoIni === '1';
+                                            const isRealBaja = mov.tipoFin === '2';
+                                            const hasClosingDate = !!mov.fBaja;
+                                            const riskIni = isRiskOrigin(mov.origenIni);
+                                            const riskFin = isRiskOrigin(mov.origenFin);
+                                            
+                                            return (
+                                                <tr key={mIdx} className={`transition-colors hover:bg-slate-50/50 ${mov.isPostBaja || mov.isBajaIrregular ? 'bg-rose-50/50 print:bg-rose-50' : ''}`}>
+                                                <td className="px-6 py-4 align-top">
+                                                    <div className="flex flex-col gap-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full print:hidden ${isReingreso ? 'bg-emerald-500 shadow-sm' : 'bg-[#D4AF37] shadow-sm'}`}></div>
+                                                        <span className={`font-bold text-sm font-mono ${mov.isPostBaja || mov.isBajaIrregular ? 'text-rose-700' : 'text-slate-700'}`}>{mov.fMov}</span>
+                                                    </div>
+                                                    <div className="flex flex-col gap-1.5 mt-1">
+                                                        {mov.fRecep === '00/00/0000' && (
+                                                        <div className="text-[9px] flex items-center gap-1 font-black rounded-md px-2 py-1.5 w-fit text-violet-700 bg-violet-50 border border-violet-200 shadow-sm print:text-violet-800 print:bg-white print:border-violet-300" title="Fecha de recepción nula. Posible captura manual irregular o migración de datos antigua.">
+                                                            <FileWarning className="w-3 h-3" />
+                                                            <span className="uppercase tracking-widest text-[8px]">REC: 00/00/0000 (SOSPECHOSO)</span>
+                                                        </div>
+                                                        )}
+
+                                                        {mov.lateInfo && mov.lateInfo.isLate && (
+                                                        <div className={`text-[9px] flex flex-col gap-0.5 rounded-md px-2 py-1.5 w-fit border shadow-sm ${mov.lateInfo.badgeClass}`} title={mov.lateInfo.obs}>
+                                                            <div className="flex items-center gap-1 font-black">
+                                                            {mov.lateInfo.isMod40Retro ? <History className="w-3 h-3" /> : (mov.lateInfo.isJustified ? <CheckCircle2 className="w-3 h-3" /> : <Thermometer className="w-3 h-3" />)}
+                                                            <span className="uppercase tracking-widest text-[8px]">{mov.lateInfo.isMod40Retro ? mov.lateInfo.label : (mov.lateInfo.isJustified ? 'EN TIEMPO' : `Extemp: ${mov.lateInfo.label}`)}</span>
+                                                            </div>
+                                                            {viewMode === 'auditor' && <span className="opacity-80 font-mono">Rec: {mov.fRecep}</span>}
+                                                            {mov.lateInfo.obs && !mov.lateInfo.isMod40Retro && (
+                                                                <span className="text-[7px] leading-tight opacity-80 mt-0.5 italic max-w-[120px]">{mov.lateInfo.obs}</span>
+                                                            )}
+                                                        </div>
+                                                        )}
+                                                        
+                                                        {mov.isPostBaja && (
+                                                        <div className="text-[9px] flex items-center gap-1 font-black rounded-md px-2 py-1 w-fit text-white bg-rose-600 shadow-sm print:text-rose-700 print:bg-transparent print:border print:border-rose-600">
+                                                            <Siren className="w-3 h-3" />
+                                                            MOV POST-CIERRE
+                                                        </div>
+                                                        )}
+                                                    </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 align-top">
+                                                    {viewMode === 'auditor' ? (
+                                                        <div className="flex flex-wrap gap-2 items-center">
+                                                            <StatusBadge code={mov.tipoIni} map={TIPO_MAP} type="T" colorOverride={isReingreso ? 'bg-emerald-50 text-emerald-700 border-emerald-200 print-border' : 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border'} />
+                                                            <ArrowRight className="w-3 h-3 text-slate-300 print:hidden" />
+                                                            <StatusBadge code={mov.origenIni} map={ORIGEN_MAP} type="O" isRisk={riskIni} />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className={`text-xs font-black uppercase tracking-widest ${isReingreso ? 'text-emerald-700' : 'text-[#003366]'}`}>{TIPO_MAP[mov.tipoIni]}</span>
+                                                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border w-fit ${riskIni ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                                {riskIni ? 'Alerta: Auditoría IMSS' : 'Trámite Regular'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right align-top">
+                                                    <span className="font-mono font-black text-slate-700 text-base">${mov.salario}</span>
+                                                </td>
+                                                <td className="px-6 py-4 align-top relative">
+                                                    <div className="absolute left-0 top-3 bottom-3 w-[2px] bg-slate-100 rounded-full print:hidden"></div>
+                                                    <div className="pl-8">
+                                                    {hasClosingDate ? (
+                                                        <div className="flex flex-col gap-2.5">
+                                                        {isRealBaja ? (
+                                                            <span className="text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-100 px-2 py-1 rounded-md w-fit flex items-center gap-1.5 shadow-sm print:border-rose-500 print:bg-rose-50">
+                                                                BAJA: <span className="font-mono">{mov.fBaja}</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[11px] font-black text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md w-fit flex items-center gap-1.5 shadow-sm print:border-slate-400 print:bg-slate-50">
+                                                                CIERRE: <span className="font-mono">{mov.fBaja}</span>
+                                                            </span>
+                                                        )}
+                                                        
+                                                        {mov.isBajaIrregular && (
+                                                            <div className="text-[9px] flex items-center gap-1 font-black rounded-md px-2 py-1 w-fit text-white bg-rose-600 shadow-sm print:text-rose-700 print:bg-white print:border-rose-700">
+                                                                <CalendarX className="w-3 h-3" />
+                                                                ¡ERROR! BAJA IMPOSIBLE
+                                                            </div>
+                                                        )}
+
+                                                        {viewMode === 'auditor' ? (
+                                                            <div className="flex flex-wrap gap-2 items-center">
+                                                                <StatusBadge code={mov.tipoFin} map={TIPO_MAP} type="T" colorOverride={isRealBaja ? "bg-rose-50 text-rose-800 border-rose-200 print-border" : "bg-slate-50 text-slate-600 border-slate-200 print-border"} />
+                                                                <span className="text-[9px] text-slate-300 print:hidden">+</span>
+                                                                <StatusBadge code={mov.origenFin} map={ORIGEN_MAP} type="O" isRisk={riskFin} />
+                                                            </div>
+                                                        ) : (
+                                                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border w-fit mt-1 ${riskFin ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                                {riskFin ? 'Cierre forzado por IMSS' : 'Trámite Regular'}
+                                                            </span>
+                                                        )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
+                                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Relación Activa
+                                                        </span>
+                                                    )}
+                                                    </div>
+                                                </td>
+                                                </tr>
+                                            );
+                                            })}
+                                        </tbody>
+                                        </table>
+                                    </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="bg-[#003366] rounded-3xl p-8 text-white shadow-xl border-t-[6px] border-[#D4AF37] mt-8 avoid-break print:bg-white print:text-slate-900 print:border print:border-slate-400 print:shadow-none page-break">
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="bg-[#D4AF37] p-3 rounded-xl shadow-inner print:hidden">
+                                    <AlertTriangle className="w-6 h-6 text-[#003366]" />
+                                    </div>
+                                    <div>
+                                    <h3 className="text-2xl font-black uppercase tracking-tight print:text-[#003366]">Diagnóstico de Riesgos</h3>
+                                    <p className="text-sm text-slate-300 print:text-slate-600 font-medium mt-1">Auditoría profunda de tiempos, orígenes y consistencia patronal.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+                                    <div className="bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center print:border-slate-300 print:bg-slate-50">
+                                        <span className="text-3xl font-black text-rose-500">{parsedData.stats.totalRisks}</span>
+                                        <span className="text-[10px] uppercase text-slate-300 print:text-slate-600 font-bold tracking-widest text-center mt-2">Movimientos Críticos</span>
+                                    </div>
+                                    <div className="bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center print:border-slate-300 print:bg-slate-50">
+                                        <span className="text-3xl font-black text-[#D4AF37] print:text-orange-600">{parsedData.stats.lateEvents.filter(e => !e.isJustified && !e.isMod40Retro).length}</span>
+                                        <span className="text-[10px] uppercase text-slate-300 print:text-slate-600 font-bold tracking-widest text-center mt-2">Extemporáneos (Riesgo)</span>
+                                    </div>
+                                    <div className="bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center print:border-slate-300 print:bg-slate-50">
+                                        <span className="text-3xl font-black text-rose-500">{parsedData.stats.bajaConflicts}</span>
+                                        <span className="text-[10px] uppercase text-slate-300 print:text-slate-600 font-bold tracking-widest text-center mt-2">Cotizaciones Post-Baja</span>
+                                    </div>
+                                    <div className="bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center print:border-slate-300 print:bg-slate-50">
+                                        <span className="text-3xl font-black text-white print:text-slate-800">{parsedData.stats.bajaCompanies.length}</span>
+                                        <span className="text-[10px] uppercase text-slate-300 print:text-slate-600 font-bold tracking-widest text-center mt-2">Empresas en Baja</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+
+                                    {parsedData.stats.riskEvents.length > 0 && (
+                                        <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden print:border-slate-300 avoid-break">
+                                            <div className="p-5 bg-rose-900/20 border-b border-rose-500/30 flex items-center gap-3 print:bg-rose-50 print:border-rose-300">
+                                                <AlertCircle className="w-5 h-5 text-rose-500 print:text-rose-600" />
+                                                <h4 className="text-sm font-black text-rose-500 uppercase tracking-widest print:text-rose-700">Detalle de Movimientos Críticos (Orígenes de Riesgo)</h4>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] uppercase text-slate-400 border-b border-white/10 bg-white/5 print:bg-slate-50 print:border-slate-300 print:text-slate-700">
+                                                    <th className="px-5 py-3 font-black">Empresa</th>
+                                                    <th className="px-5 py-3 font-black">Fecha Movimiento</th>
+                                                    <th className="px-5 py-3 font-black">Etapa</th>
+                                                    <th className="px-5 py-3 font-black">Motivo / Riesgo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5 text-sm print:divide-slate-200">
+                                                    {parsedData.stats.riskEvents.map((ev, i) => (
+                                                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                        <td className="px-5 py-4 font-bold text-white print:text-slate-800">{ev.empresa}</td>
+                                                        <td className="px-5 py-4 font-mono text-slate-400 print:text-slate-700">{ev.fecha}</td>
+                                                        <td className="px-5 py-4 text-slate-300 print:text-slate-600 font-bold">{ev.etapa} <span className="text-xs opacity-70">({ev.desc})</span></td>
+                                                        <td className="px-5 py-4">
+                                                            <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border shadow-sm bg-rose-950/50 border-rose-800/50 print:bg-rose-100 print:border-rose-200">
+                                                                <span className="font-mono text-xs font-black text-rose-400 print:text-rose-700">ORIGEN {ev.origen}</span>
+                                                                <span className="opacity-50 text-xs text-rose-400 print:text-rose-700">|</span>
+                                                                <span className="uppercase text-[10px] font-bold tracking-widest text-rose-300 print:text-rose-800">{ORIGEN_MAP[ev.origen]}</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    ))}
+                                                </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {parsedData.stats.suspiciousDates.length > 0 && (
+                                        <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden print:border-slate-300 avoid-break">
+                                            <div className="p-5 bg-violet-900/20 border-b border-violet-500/30 flex items-center gap-3 print:bg-violet-50 print:border-violet-300">
+                                                <FileWarning className="w-5 h-5 text-violet-400 print:text-violet-600" />
+                                                <h4 className="text-sm font-black text-violet-400 uppercase tracking-widest print:text-violet-700">Registros con Fecha de Recepción Nula (00/00/0000)</h4>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-[10px] uppercase text-slate-400 border-b border-white/10 bg-white/5 print:bg-slate-50 print:border-slate-300 print:text-slate-700">
+                                                    <th className="px-5 py-3 font-black">Empresa</th>
+                                                    <th className="px-5 py-3 font-black">Fecha Efectiva</th>
+                                                    <th className="px-5 py-3 font-black">Tipo de Movimiento</th>
+                                                    <th className="px-5 py-3 font-black">Observación</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5 text-sm print:divide-slate-200">
+                                                    {parsedData.stats.suspiciousDates.map((ev, i) => (
+                                                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                        <td className="px-5 py-4 font-bold text-white print:text-slate-800">{ev.empresa}</td>
+                                                        <td className="px-5 py-4 font-mono text-slate-400 print:text-slate-700">{ev.fecha}</td>
+                                                        <td className="px-5 py-4 text-slate-300 print:text-slate-600 font-bold">{TIPO_MAP[ev.tipo] || 'Movimiento'}</td>
+                                                        <td className="px-5 py-4">
+                                                            <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border shadow-sm bg-violet-950/50 border-violet-800/50 print:bg-violet-100 print:border-violet-200">
+                                                                <span className="font-mono text-xs font-black text-violet-400 print:text-violet-700">REC: 00/00/0000</span>
+                                                                <span className="opacity-50 text-xs text-violet-400 print:text-violet-700">|</span>
+                                                                <span className="uppercase text-[10px] font-bold tracking-widest text-violet-300 print:text-violet-800">Posible captura irregular o migración</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    ))}
+                                                </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {parsedData.stats.lateEvents.length > 0 && (
+                                    <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden print:border-slate-300 avoid-break">
+                                        <div className="p-5 bg-white/5 border-b border-white/10 flex items-center gap-3 print:bg-slate-100 print:border-slate-300">
+                                        <Thermometer className="w-5 h-5 text-[#D4AF37] print:text-orange-600" />
+                                        <h4 className="text-sm font-black text-white uppercase tracking-widest print:text-[#003366]">Presentaciones Extemporáneas y Retroactivas</h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="text-[10px] uppercase text-slate-400 border-b border-white/10 bg-white/5 print:bg-slate-50 print:border-slate-300 print:text-slate-700">
+                                                <th className="px-5 py-3 font-black">Empresa</th>
+                                                <th className="px-5 py-3 font-black">Movimiento</th>
+                                                <th className="px-5 py-3 font-black">Fecha Efectiva</th>
+                                                <th className="px-5 py-3 font-black">Naturaleza de Trámite</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5 text-sm print:divide-slate-200">
+                                                {parsedData.stats.lateEvents.map((ev, i) => (
+                                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-5 py-4 font-bold text-white print:text-slate-800">{ev.empresa}</td>
+                                                    <td className="px-5 py-4 text-slate-300 print:text-slate-600 font-bold">{ev.tipo}</td>
+                                                    <td className="px-5 py-4 font-mono text-slate-400 print:text-slate-700">{ev.fechaMov}</td>
+                                                    <td className="px-5 py-4">
+                                                        <div className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border shadow-sm ${ev.badgeClass} print:bg-white`}>
+                                                            <span className="font-mono text-xs font-black">{ev.diffDays} DÍAS</span>
+                                                            <span className="opacity-50 text-xs">|</span>
+                                                            <span className="uppercase text-[10px] font-bold tracking-widest">{ev.label}</span>
+                                                        </div>
+                                                        {ev.obs && !ev.isMod40Retro && (
+                                                            <div className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 print:text-slate-500">
+                                                                <FileWarning className="w-3 h-3 text-slate-500"/> {ev.obs}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                                ))}
+                                            </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    )}
+
+                                    {parsedData.stats.bajaCompanies.length > 0 && (
+                                    <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden print:border-slate-300 avoid-break">
+                                        <div className="p-5 bg-white/5 border-b border-white/10 flex items-center gap-3 print:bg-slate-100 print:border-slate-300">
+                                        <Ban className="w-5 h-5 text-slate-300 print:text-slate-600" />
+                                        <h4 className="text-sm font-black text-white uppercase tracking-widest print:text-[#003366]">Empresas Dadas de Baja (Art. 251)</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-4 p-5">
+                                            {parsedData.stats.bajaCompanies.map((baja, i) => (
+                                            <div key={i} className={`p-5 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors ${baja.hasPostBajaMovements ? 'bg-rose-900/20 border-rose-500/50 print:bg-rose-50 print:border-rose-400' : 'bg-white/5 border-white/10 print:bg-white print:border-slate-300'}`}>
+                                                
+                                                <div className="flex items-start gap-4">
+                                                <Building2 className={`w-10 h-10 p-2 rounded-xl print:bg-transparent ${baja.hasPostBajaMovements ? 'text-rose-400 bg-rose-950 print:text-rose-600' : 'text-slate-400 bg-slate-800 print:text-[#003366]'}`} />
+                                                <div>
+                                                    <div className="text-base font-black text-white mb-1.5 print:text-slate-800">{baja.nombre}</div>
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                    <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-600 px-2 py-1 rounded-md uppercase font-bold tracking-widest print:bg-slate-100 print:text-slate-600 print:border-slate-300">
+                                                        {baja.razon}
+                                                    </span>
+                                                    <div className="flex flex-col gap-0.5 mt-1 sm:mt-0">
+                                                        <span className="text-xs text-slate-400 font-mono font-bold print:text-slate-600">
+                                                            Cierre Empresa: {formatDate(baja.fecha)}
+                                                        </span>
+                                                        <span className="text-[11px] text-[#D4AF37] font-mono font-bold print:text-orange-700">
+                                                            Baja Trabajador: {baja.workerBajaDateStr}
+                                                        </span>
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                </div>
+
+                                                <div className="shrink-0 w-full md:w-auto">
+                                                {baja.hasPostBajaMovements ? (
+                                                    <div className="flex items-center gap-3 bg-rose-600/10 border border-rose-600 text-rose-400 px-4 py-2.5 rounded-xl shadow-sm print:bg-white print:text-rose-600">
+                                                    <Siren className="w-5 h-5 animate-pulse" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-widest">Alerta de Fraude</span>
+                                                        <span className="text-[10px] font-semibold">Cotizaciones post-clausura detectadas.</span>
+                                                    </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-3 text-emerald-400 px-4 py-2.5 bg-emerald-900/20 border border-emerald-500/30 rounded-xl print:bg-white print:text-emerald-600 print:border-emerald-600">
+                                                    <CheckCircle2 className="w-5 h-5" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-black uppercase tracking-widest">Estatus Lógico</span>
+                                                        <span className="text-[10px] font-semibold">Sin reportes posteriores a la baja.</span>
+                                                    </div>
+                                                    </div>
+                                                )}
+                                                </div>
+
+                                            </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    )}
+                                </div>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {cruceData && (
+                        <div className={`tab-content ${activeTab === 'cruce' ? 'block' : 'hidden'} page-break pt-4`}>
+                            
+                            <div className="flex items-center gap-3 mb-8 print:mt-4">
+                                <div className="bg-[#D4AF37] p-2 rounded-lg print:hidden"><GitMerge className="w-6 h-6 text-[#003366]" /></div>
+                                <h3 className="text-2xl font-black text-[#003366] uppercase tracking-widest border-b-4 border-[#D4AF37] pb-2 w-full print-text-blue">3. Auditoría Cruzada: SINDO vs SISEC</h3>
+                            </div>
+
+                            {cruceData.alertas.length > 0 && (
+                                <div className="bg-rose-50 border-l-[8px] border-rose-600 p-6 rounded-r-2xl mb-8 shadow-sm print:border-rose-600">
+                                    <h4 className="text-sm font-black text-rose-800 uppercase tracking-widest mb-4">Alertas Críticas de Identidad</h4>
+                                    {cruceData.alertas.map((al, i) => (
+                                        <div key={i} className="flex items-center gap-3 text-rose-700 font-bold bg-white p-4 rounded-xl border border-rose-200 shadow-sm">
+                                            <AlertTriangle className="w-6 h-6 shrink-0" />
+                                            <span>{al.msj}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="grid gap-8 avoid-break">
+                                {cruceData.patronesComparados.map((comp, i) => (
+                                    <div key={i} className={`p-6 rounded-3xl border-[2px] transition-shadow shadow-sm avoid-break print:shadow-none print-border ${
+                                        comp.status === 'CRITICO' ? 'bg-rose-50/50 border-rose-300' : 
+                                        comp.status === 'ALERTA' ? 'bg-orange-50/50 border-orange-200' : 
+                                        'bg-white border-slate-200'
+                                    }`}>
+                                        <div className="flex justify-between items-start mb-6 border-b border-slate-200/60 pb-4">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                    <Briefcase className="w-4 h-4 text-slate-400" />
+                                                    <span className="text-xs font-black font-mono text-slate-500 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">REG: {comp.registro}</span>
+                                                    {comp.isInternalAdjustment && (
+                                                        <span className="text-[10px] bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest flex items-center gap-1 print:bg-white print:border-indigo-400">
+                                                            <ShieldCheck className="w-3 h-3" />
+                                                            Ajuste Interno
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <h4 className="text-xl font-black text-[#003366]">{comp.nombre}</h4>
+                                                {comp.hasMultiplePeriods && (
+                                                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-black tracking-widest uppercase">
+                                                        <History className="w-4 h-4" /> Historial unificado ({comp.maxPeriodsCount} periodos laborales detectados)
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <StatusBadgeCruce status={comp.status} />
+                                        </div>
+                                        
+                                        {comp.detalles.length > 0 && (
+                                            <ul className="space-y-3 mb-6">
+                                                {comp.detalles.map((det, j) => {
+                                                    let icon = <ArrowRight className="w-5 h-5 mt-0.5 shrink-0 text-slate-400" />;
+                                                    let textColor = "text-slate-800";
+                                                    if (det.tipo === 'CRITICO') { icon = <Siren className="w-5 h-5 mt-0.5 shrink-0 text-rose-600 animate-pulse print-text-rose-600" />; textColor = "text-rose-700 font-bold"; }
+                                                    if (det.tipo === 'ALERTA') { icon = <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0 text-orange-500" />; textColor = "text-orange-700 font-semibold"; }
+                                                    if (det.tipo === 'INFO') { icon = <FileWarning className="w-5 h-5 mt-0.5 shrink-0 text-[#003366]" />; textColor = "text-[#003366]"; }
+                                                    if (det.tipo === 'OK') { icon = <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0 text-emerald-600" />; textColor = "text-emerald-700 font-bold"; }
+                                                    
+                                                    return (
+                                                        <li key={j} className="text-sm flex items-start gap-3 bg-white/60 p-4 rounded-xl border border-slate-200 print-bg-white print-border shadow-sm">
+                                                            {icon}
+                                                            <span className={textColor}>{det.desc}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+
+                                        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm print-border">
+                                            <table className="w-full text-left text-sm print:min-w-full">
+                                                <thead className="bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] print-bg-slate-50">
+                                                    <tr>
+                                                        <th className="px-5 py-3 font-black border-b border-slate-200 w-[15%]">Clasificación</th>
+                                                        <th className="px-5 py-3 font-black border-b border-slate-200 w-[30%] bg-blue-50/50 print-bg-slate-100 text-[#003366]">Reporte SISEC</th>
+                                                        <th className="px-5 py-3 font-black border-b border-slate-200 w-[30%] bg-slate-50 print-bg-slate-100">Historial SINDO</th>
+                                                        <th className="px-5 py-3 font-black border-b border-slate-200 w-[25%] text-center">Estatus</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 bg-white print-divide-slate-200">
+                                                    {comp.movimientosCruzados.map((mov, mIdx) => (
+                                                        <tr key={mIdx} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="px-5 py-3 font-black text-slate-700 text-xs">
+                                                                <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded-md text-[9px] uppercase tracking-widest">{mov.tipoClasif}</span>
+                                                            </td>
+                                                            
+                                                            <td className={`px-5 py-3 font-mono text-sm ${mov.sisec ? 'text-slate-800 font-semibold' : 'text-slate-300 italic print-text-slate-400'}`}>
+                                                                {mov.sisec ? (
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <span className="text-[10px] text-[#003366] font-black uppercase tracking-widest">{mov.sisec.tipoOriginal}</span>
+                                                                        <span>{mov.sisec.fecha} - ${mov.sisec.salario}</span>
+                                                                    </div>
+                                                                ) : 'No reportado'}
+                                                            </td>
+                                                            
+                                                            <td className={`px-5 py-3 font-mono text-sm ${mov.sindo ? 'text-slate-800 font-semibold' : 'text-slate-300 italic print-text-slate-400'}`}>
+                                                                {mov.sindo ? (
+                                                                    <div className="flex flex-col gap-2">
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <span className="text-[10px] text-[#003366] font-black uppercase tracking-widest">{mov.sindo.tipoOriginal}</span>
+                                                                            <span>{mov.sindo.fecha} - ${mov.sindo.salario}</span>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                                                            <StatusBadge code={mov.sindo.tipoCod} map={TIPO_MAP} type="T" colorOverride="bg-slate-50 text-slate-500 border-slate-200 print-border" />
+                                                                            <span className="text-[9px] text-slate-300 print:hidden">+</span>
+                                                                            <StatusBadge code={mov.sindo.origen} map={ORIGEN_MAP} type="O" isRisk={mov.sindo.isRisk} />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : 'No reportado'}
+                                                            </td>
+                                                            
+                                                            <td className="px-5 py-3 text-center">
+                                                                {mov.status === 'MATCH' && <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md text-[10px] font-black tracking-widest uppercase print-border"><CheckCircle2 className="w-3 h-3" /> OK</span>}
+                                                                {mov.status === 'MISMATCH_SALARIO' && <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-800 px-2.5 py-1 rounded-md text-[10px] font-black tracking-widest uppercase print-border"><AlertTriangle className="w-3 h-3" /> Dif. Salario</span>}
+                                                                {mov.status === 'ONLY_SISEC' && <span className="inline-flex items-center gap-1.5 bg-rose-100 text-rose-800 px-2.5 py-1 rounded-md text-[10px] font-black tracking-widest uppercase print-border"><XCircle className="w-3 h-3" /> Falta SINDO</span>}
+                                                                {mov.status === 'ONLY_SINDO' && <span className="inline-flex items-center gap-1.5 bg-rose-100 text-rose-800 px-2.5 py-1 rounded-md text-[10px] font-black tracking-widest uppercase print-border"><XCircle className="w-3 h-3" /> Falta SISEC</span>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {comp.movimientosCruzados.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan="4" className="px-5 py-8 text-center text-slate-400 italic font-medium">No se encontraron movimientos comparables para este registro.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                        </div>
+                    )}
+
+                </div>
+                )}
+            </div>
+            </div>
+        );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
