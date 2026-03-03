@@ -15,10 +15,17 @@
     <!-- 3. Babel (Traduce el código JSX para que el navegador lo entienda) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 4. Iconos Lucide y Librerías de PDF Nativas (jsPDF + autoTable) -->
+    <!-- 4. Iconos Lucide y Librerías de PDF Nativas (jsPDF + autoTable) y JSZip -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- PDF.js para lectura nativa (Agregado para leer SISEC sin copiar/pegar) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     
@@ -29,12 +36,28 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // --- FUNCIÓN SEGURA PARA COPIAR AL PORTAPAPELES (Evita error en iFrame) ---
+        const copyToClipboard = (text) => {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            } catch (err) {
+                console.error('Error al copiar al portapapeles: ', err);
+            }
+        };
+
         // --- SOLUCIÓN ERROR REMOVECHILD: MAPEO SEGURO DE ICONOS ---
         const Icon = ({ name, className }) => {
             const svgString = React.useMemo(() => {
                 if (!window.lucide) return '';
-                // Renderizamos el icono en un div temporal desconectado para que 
-                // Lucide no destruya los nodos del DOM que React controla.
                 const div = document.createElement('div');
                 div.innerHTML = `<i data-lucide="${name}" class="${className || ''}"></i>`;
                 window.lucide.createIcons({ root: div });
@@ -70,9 +93,26 @@
         const FileSpreadsheet = (p) => <Icon name="file-spreadsheet" {...p} />;
         const Eye = (p) => <Icon name="eye" {...p} />;
         const History = (p) => <Icon name="history" {...p} />;
+        const FolderOpen = (p) => <Icon name="folder-open" {...p} />;
+        const ExternalLink = (p) => <Icon name="external-link" {...p} />;
+        const Video = (p) => <Icon name="video" {...p} />;
+        const DownloadCloud = (p) => <Icon name="download-cloud" {...p} />;
+        const CheckSquare = (p) => <Icon name="check-square" {...p} />;
+        const Type = (p) => <Icon name="type" {...p} />;
+        const FileUp = (p) => <Icon name="file-up" {...p} />;
+        const CheckCircle = (p) => <Icon name="check-circle" {...p} />;
+        const Copy = (p) => <Icon name="copy" {...p} />;
+        const Camera = (p) => <Icon name="camera" {...p} />;
+        const ScanLine = (p) => <Icon name="scan-line" {...p} />;
+        const Target = (p) => <Icon name="target" {...p} />;
+        const Scale = (p) => <Icon name="scale" {...p} />;
+        const FileSearch = (p) => <Icon name="file-search" {...p} />;
+        const UploadCloud = (p) => <Icon name="upload-cloud" {...p} />;
+        const Send = (p) => <Icon name="send" {...p} />;
+        const Cloud = (p) => <Icon name="cloud" {...p} />;
 
-        // --- ESTILOS GLOBALES DE IMPRESIÓN Y GENERADOR PDF ---
-        const printStyles = `
+        // --- ESTILOS GLOBALES ---
+        const customStyles = `
         @media print {
             @page { size: A4 portrait; margin: 1.5cm; }
             body { 
@@ -84,32 +124,18 @@
             }
             .print-hidden { display: none !important; }
             .print-block { display: block !important; }
-            .print-flex { display: flex !important; }
             .page-break { page-break-before: always; }
             .avoid-break { page-break-inside: avoid; break-inside: avoid; }
             * { box-shadow: none !important; }
             .print-border { border: 1px solid #cbd5e1 !important; }
-            .print-bg-blue { background-color: #003366 !important; color: white !important; }
-            .print-bg-gold { background-color: #D4AF37 !important; color: #003366 !important; }
-            .print-text-blue { color: #003366 !important; }
-            .print-text-gold { color: #D4AF37 !important; }
             .tab-content { display: block !important; }
         }
 
-        .pdf-mode {
-            background-color: white !important;
-            padding: 20px !important;
-            color: #1e293b !important;
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .pdf-mode .print\\:hidden { display: none !important; }
-        .pdf-mode .print\\:block { display: block !important; }
-        .pdf-mode .print\\:flex { display: flex !important; }
-        .pdf-mode .print\\:shadow-none { box-shadow: none !important; }
-        .pdf-mode .print\\:bg-white { background-color: white !important; }
-        .pdf-mode .print\\:border { border: 1px solid #cbd5e1 !important; }
-        .pdf-mode .tab-content { display: block !important; }
-        .pdf-mode .page-break { page-break-before: always; }
-        .pdf-mode .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+        .animate-toast { animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         `;
 
         // --- DEFINICIONES Y MAPEOS ---
@@ -124,7 +150,6 @@
         '8': 'Reingreso', '7': 'Modif. Salarial', '1': 'Alta', '2': 'Baja'
         };
 
-        // --- UTILIDADES ---
         const parseDateStr = (str) => {
         if (!str) return null;
         const match = str.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
@@ -149,105 +174,1016 @@
         return /9{4,}00$/.test(regPatronal);
         };
 
-        // --- TERMÓMETRO DE EXTEMPORANEIDAD ---
         const getLateSubmissionInfo = (fRecep, fMov) => {
-        if (!fRecep || fRecep === '00/00/0000') return { isLate: false }; 
-        const dRecep = parseDateStr(fRecep);
-        const dMov = parseDateStr(fMov);
-        if (!dRecep || !dMov) return { isLate: false };
+            if (!fRecep || fRecep === '00/00/0000') return { isLate: false }; 
+            const dRecep = parseDateStr(fRecep);
+            const dMov = parseDateStr(fMov);
+            if (!dRecep || !dMov) return { isLate: false };
 
-        const diffTime = dRecep.getTime() - dMov.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            const diffTime = dRecep.getTime() - dMov.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-        if (diffDays <= 5) return { isLate: false };
+            if (diffDays <= 5) return { isLate: false };
 
-        let weekendDays = 0;
-        let curDate = new Date(dMov.getTime());
-        curDate.setDate(curDate.getDate() + 1); 
-        while (curDate <= dRecep) {
-            const dayOfWeek = curDate.getDay();
-            if (dayOfWeek === 0 || dayOfWeek === 6) weekendDays++;
-            curDate.setDate(curDate.getDate() + 1);
-        }
+            let weekendDays = 0;
+            let curDate = new Date(dMov.getTime());
+            curDate.setDate(curDate.getDate() + 1); 
+            while (curDate <= dRecep) {
+                const dayOfWeek = curDate.getDay();
+                if (dayOfWeek === 0 || dayOfWeek === 6) weekendDays++;
+                curDate.setDate(curDate.getDate() + 1);
+            }
 
-        const businessDays = diffDays - weekendDays;
-        let level = 0, colorClass = '', label = '', badgeClass = '', obs = '';
+            const businessDays = diffDays - weekendDays;
+            let level = 0, colorClass = '', label = '', badgeClass = '', obs = '';
 
-        if (businessDays <= 5) {
-            return {
-                isLate: true,
-                isJustified: true,
-                diffDays,
-                businessDays,
-                level: 0,
-                label: 'En Tiempo (Hábiles)',
-                colorClass: 'text-emerald-600',
-                badgeClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-                obs: `Se cruzaron ${weekendDays} días inhábiles (sábado/domingo).`
-            };
-        }
+            if (businessDays <= 5) {
+                return {
+                    isLate: true,
+                    isJustified: true,
+                    diffDays,
+                    businessDays,
+                    level: 0,
+                    label: 'En Tiempo (Hábiles)',
+                    colorClass: 'text-emerald-600',
+                    badgeClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                    obs: `Se cruzaron ${weekendDays} días inhábiles (sábado/domingo).`
+                };
+            }
 
-        if (diffDays >= 6 && diffDays <= 14) {
-            level = 1; label = '5 a 14 días'; colorClass = 'text-yellow-600'; badgeClass = 'bg-yellow-50 border-yellow-200 text-yellow-700';
-        } else if (diffDays >= 15 && diffDays <= 30) {
-            level = 2; label = '15 a 30 días'; colorClass = 'text-orange-500'; badgeClass = 'bg-orange-50 border-orange-200 text-orange-700 font-semibold';
-        } else if (diffDays > 30 && diffDays <= 365) {
-            level = 3; label = '1 a 12 meses'; colorClass = 'text-red-500'; badgeClass = 'bg-red-50 border-red-300 text-red-700 font-bold';
-        } else if (diffDays > 365) {
-            level = 4; label = '+ de 1 año'; colorClass = 'text-rose-600'; badgeClass = 'bg-rose-600 border-rose-700 text-white font-black shadow-md';
-        }
+            if (diffDays >= 6 && diffDays <= 14) {
+                level = 1; label = '5 a 14 días'; colorClass = 'text-yellow-600'; badgeClass = 'bg-yellow-50 border-yellow-200 text-yellow-700';
+            } else if (diffDays >= 15 && diffDays <= 30) {
+                level = 2; label = '15 a 30 días'; colorClass = 'text-orange-500'; badgeClass = 'bg-orange-50 border-orange-200 text-orange-700 font-semibold';
+            } else if (diffDays > 30 && diffDays <= 365) {
+                level = 3; label = '1 a 12 meses'; colorClass = 'text-red-500'; badgeClass = 'bg-red-50 border-red-300 text-red-700 font-bold';
+            } else if (diffDays > 365) {
+                level = 4; label = '+ de 1 año'; colorClass = 'text-rose-600'; badgeClass = 'bg-rose-600 border-rose-700 text-white font-black shadow-md';
+            }
 
-        if (weekendDays > 0) {
-            obs = `Excedido. Incluye ${weekendDays} días inhábiles de fin de semana.`;
-        }
+            if (weekendDays > 0) {
+                obs = `Excedido. Incluye ${weekendDays} días inhábiles de fin de semana.`;
+            }
 
-        return { isLate: true, isJustified: false, diffDays, businessDays, level, label, colorClass, badgeClass, obs };
+            return { isLate: true, isJustified: false, diffDays, businessDays, level, label, colorClass, badgeClass, obs };
         };
 
-        // --- COMPONENTES VISUALES ---
         const StatusBadge = ({ code, map, type, isRisk, colorOverride }) => {
-        const label = map[code] || `Código ${code}`;
-        let styles = type === 'O' 
-            ? 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border' 
-            : 'bg-slate-50 text-slate-700 border-slate-200 print-border';
+            const label = map[code] || `Código ${code}`;
+            let styles = type === 'O' 
+                ? 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border' 
+                : 'bg-slate-50 text-slate-700 border-slate-200 print-border';
 
-        if (colorOverride) styles = colorOverride;
-        if (isRisk) styles = 'bg-rose-100 text-rose-800 border-rose-200 font-bold print-border print-text-rose-600';
+            if (colorOverride) styles = colorOverride;
+            if (isRisk) styles = 'bg-rose-100 text-rose-800 border-rose-200 font-bold print-border print-text-rose-600';
 
-        return (
-            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] uppercase tracking-tight w-fit ${styles}`}>
-            <span className="opacity-60 font-semibold">{type}:</span>
-            <span className="font-semibold">{label}</span>
-            {isRisk && <AlertCircle className="w-3 h-3 text-rose-600" />}
-            </div>
-        );
+            return (
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] uppercase tracking-tight w-fit ${styles}`}>
+                <span className="opacity-60 font-semibold">{type}:</span>
+                <span className="font-semibold">{label}</span>
+                {isRisk && <AlertCircle className="w-3 h-3 text-rose-600" />}
+                </div>
+            );
         };
 
         const StatusBadgeCruce = ({ status }) => {
-        let styles = "";
-        if(status === 'CRITICO') styles = "bg-rose-600 text-white border-rose-700 print-bg-rose-600";
-        if(status === 'ALERTA') styles = "bg-orange-500 text-white border-orange-600";
-        if(status === 'INFO') styles = "bg-[#003366] text-white border-[#002244] print-bg-blue";
-        if(status === 'OK') styles = "bg-emerald-50 text-emerald-700 border-emerald-200";
-        
-        return (
-            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md border shadow-sm ${styles}`}>
-                {status}
-            </span>
-        )
+            let styles = "";
+            if(status === 'CRITICO') styles = "bg-rose-600 text-white border-rose-700 print-bg-rose-600";
+            if(status === 'ALERTA') styles = "bg-orange-500 text-white border-orange-600";
+            if(status === 'INFO') styles = "bg-[#003366] text-white border-[#002244] print-bg-blue";
+            if(status === 'OK') styles = "bg-emerald-50 text-emerald-700 border-emerald-200";
+            
+            return (
+                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md border shadow-sm ${styles}`}>
+                    {status}
+                </span>
+            )
         };
 
-        const ModuloPension = () => {
-        return (
-            <div className="w-full h-[85vh] min-h-[600px] rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center relative shadow-inner">
-                <iframe 
-                src="https://robertoiroc.github.io/COTIZADOR/" 
-                title="Cálculo de Pensión RGC" 
-                className="w-full h-full border-0 bg-white"
-                allow="clipboard-write; clipboard-read"
-                />
-            </div>
-        );
+        // --- MÓDULO PENSIÓN MEJORADO ---
+        const ModuloPension = ({ dataBridge }) => {
+            return (
+                <div className="flex flex-col md:flex-row gap-4 h-[85vh] min-h-[600px] bg-slate-50 p-2 rounded-2xl">
+                    {dataBridge && (
+                        <div className="w-full md:w-64 bg-[#003366] text-white p-6 rounded-2xl shadow-lg flex flex-col gap-6 relative overflow-hidden shrink-0">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                <Calculator className="w-32 h-32" />
+                            </div>
+                            <div className="relative z-10">
+                                <h3 className="font-black tracking-widest uppercase text-xs border-b border-white/20 pb-3 mb-6 flex items-center gap-2">
+                                    <Send className="w-4 h-4 text-[#D4AF37]"/> Datos Extraídos
+                                </h3>
+                                
+                                <div className="space-y-5">
+                                    <div>
+                                        <p className="text-[10px] text-[#D4AF37] uppercase font-bold tracking-widest mb-1">Asegurado</p>
+                                        <p className="font-black text-sm leading-tight bg-white/10 px-3 py-2 rounded-lg">{dataBridge.nombre}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-[#D4AF37] uppercase font-bold tracking-widest mb-1">Semanas Cotizadas</p>
+                                        <p className="text-3xl font-black px-3">{dataBridge.semanas}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-[#D4AF37] uppercase font-bold tracking-widest mb-1">Último Salario Ref.</p>
+                                        <p className="text-xl font-mono font-bold px-3">${dataBridge.salario}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-auto bg-[#D4AF37]/10 border border-[#D4AF37]/30 p-4 rounded-xl text-xs text-[#D4AF37] relative z-10">
+                                <strong className="block mb-1">💡 Asistente RGC:</strong> 
+                                Utiliza estos valores confirmados para llenar los campos de la calculadora.
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="flex-1 rounded-2xl overflow-hidden bg-white border border-slate-200 relative shadow-inner">
+                        <iframe 
+                        src="https://robertoiroc.github.io/COTIZADOR/" 
+                        title="Cálculo de Pensión RGC" 
+                        className="w-full h-full border-0 bg-white"
+                        allow="clipboard-write; clipboard-read"
+                        />
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MÓDULO DE DOCUMENTOS COMPLETO ---
+        const ModuloDocumentos = ({ showToast }) => {
+            const [docTab, setDocTab] = useState('asesoria');
+            
+            // Estados para Generador de Nombres
+            const [clientName, setClientName] = useState('');
+            const [docVars, setDocVars] = useState({});
+            const [draggedDoc, setDraggedDoc] = useState(null);
+
+            const docsConfig = [
+                { id: 'acta', prefijo: 'ACTA DE NACIMIENTO', vars: ['FECHA EXP', 'OBS'] },
+                { id: 'ine', prefijo: 'INE', vars: ['VIGENCIA AÑO', 'OBS'] },
+                { id: 'curp', prefijo: 'CURP', vars: ['CLAVE 18', 'CERTIFICADA'] },
+                { id: 'afore', prefijo: 'EDO CTA AFORE', vars: ['AFORE', 'PERIODO', 'TOTAL $'] },
+                { id: 'banco', prefijo: 'EDO CTA BANCARIO', vars: ['BANCO', 'CLABE', 'ESTATUS'] },
+                { id: 'csf', prefijo: 'CONSTANCIA FISCAL', vars: ['RFC', 'FECHA', 'OBS'] },
+                { id: 'domicilio', prefijo: 'COMPROBANTE DOMICILIO', vars: ['PROVEEDOR', 'FECHA', 'COINCIDE INE'] },
+                { id: 'matrimonio', prefijo: 'ACTA MATRIMONIO', vars: ['TITULAR', 'BENEFICIARIO', 'FECHA'] },
+                { id: 'contrato', prefijo: 'CONTRATO', vars: ['FECHA', 'FIRMADO COMPLETO'] }
+            ];
+
+            const handleDownloadFolders = () => {
+                const zip = new window.JSZip();
+                const mainFolder = zip.folder("EXPEDIENTE_CLIENTE_RGC");
+                
+                mainFolder.folder("0. SISEC (DIGITAL Y ANOTACIONES)");
+                mainFolder.folder("1. ACTA DE NACIMIENTO");
+                mainFolder.folder("2. INE");
+                mainFolder.folder("3. CURP");
+                mainFolder.folder("4. ESTADO DE CUENTA DE LA AFORE");
+                mainFolder.folder("5. ESTADO DE CUENTA BANCARIO");
+                mainFolder.folder("6. CONSTANCIA DE SITUACION FISCAL (RFC)");
+                mainFolder.folder("7. COMPROBANTE DE DOMICILIO");
+                mainFolder.folder("8. ACTA DE MATRIMONIO - BENEFICIARIOS");
+                
+                const obligadoFolder = mainFolder.folder("9. OBLIGADO SOLIDARIO");
+                obligadoFolder.folder("1. ACTA DE NACIMIENTO");
+                obligadoFolder.folder("2. INE");
+                obligadoFolder.folder("3. CURP");
+                obligadoFolder.folder("4. CONSTANCIA FISCAL");
+                obligadoFolder.folder("5. COMPROBANTE DE DOMICILIO");
+
+                mainFolder.folder("10. CONTRATO FIRMADO Y PAGARE ADICIONAL");
+                mainFolder.folder("11. FOTOS PAGARE Y CONTRATO");
+
+                const otrosFolder = mainFolder.folder("OTROS DOCUMENTOS");
+                otrosFolder.folder("A. ESTRATEGIA");
+                otrosFolder.folder("B. HISTORIAL PATRONAL");
+                otrosFolder.folder("C. HISTORIAL DE INFONAVIT");
+                otrosFolder.folder("D. COMPARA DATOS");
+                otrosFolder.folder("E. AVISOS IMSS (HOJAS ROSAS)");
+                otrosFolder.folder("F. RECIBOS DE NOMINA");
+                otrosFolder.folder("G. RESOLUCIONES");
+                otrosFolder.folder("H. SINAVID ISSSTE");
+                otrosFolder.folder("I. EXCEPCIONES");
+
+                zip.generateAsync({type:"blob"}).then(function(content) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = "Plantilla_Carpetas_RGC.zip";
+                    link.click();
+                });
+                
+                if(showToast) showToast('Plantilla descargada', 'success');
+            };
+
+            const handleDownloadAllCustomFolders = () => {
+                if(!clientName) {
+                    if(showToast) showToast('Escribe el nombre del cliente primero', 'error');
+                    return;
+                }
+                const zip = new window.JSZip();
+                const mainFolder = zip.folder(`EXPEDIENTE - ${clientName}`);
+                
+                docsConfig.forEach(doc => {
+                    let finalName = `${doc.prefijo} - ${clientName}`;
+                    doc.vars.forEach(v => {
+                        const val = docVars[`${doc.id}_${v}`];
+                        if (val && val.trim() !== '') {
+                            finalName += ` - ${val.trim().toUpperCase()}`;
+                        } else {
+                            finalName += ` - [${v}]`;
+                        }
+                    });
+                    mainFolder.folder(finalName);
+                });
+
+                zip.generateAsync({type:"blob"}).then(function(content) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `Carpetas_${clientName}.zip`;
+                    link.click();
+                });
+                if(showToast) showToast('Carpetas descargadas con éxito', 'success');
+            };
+
+            const handleDownloadRutaPDF = () => {
+                if(showToast) showToast('Generando PDF...', 'success');
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF('p', 'pt', 'letter');
+                    const colorPrimary = [0, 51, 102]; // #003366
+                    const colorGold = [212, 175, 55];  // #D4AF37
+                    
+                    let yPos = 40;
+                    
+                    doc.setFontSize(16);
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("ASESORÍA - PASO A PASO (EL PILAR RGC)", 40, yPos);
+                    
+                    yPos += 20;
+                    doc.setDrawColor(colorGold[0], colorGold[1], colorGold[2]);
+                    doc.setLineWidth(2);
+                    doc.line(40, yPos, 570, yPos);
+                    yPos += 25;
+
+                    // Intro
+                    doc.setFontSize(11);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "normal");
+                    const intro = "En RGC Pensiones y Seguros no improvisamos con el futuro de nuestros clientes. Tramitar una pensión es un proceso legal y técnico. Esta es la ruta estricta que seguimos para blindar su retiro.";
+                    const splitIntro = doc.splitTextToSize(intro, 530);
+                    doc.text(splitIntro, 40, yPos);
+                    yPos += (splitIntro.length * 14) + 20;
+
+                    // Step 1
+                    doc.setFontSize(14);
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("1. ASESORÍA INICIAL (BASE SISEC)", 40, yPos);
+                    yPos += 20;
+
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Es el primer acercamiento. Revisamos la Constancia de Semanas Cotizadas (SISEC) para dar un panorama general.", 40, yPos);
+                    yPos += 20;
+
+                    // Gratuito
+                    doc.setFontSize(11);
+                    doc.setTextColor(5, 150, 105); // emerald
+                    doc.setFont("helvetica", "bold");
+                    doc.text("PERFIL GRATUITO (PREFERENTEMENTE)", 40, yPos);
+                    yPos += 15;
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("• Cliente de 58 años en adelante.\n• Historial limpio (Sin pagos previos de Modalidad 10 o Modalidad 40).\n• Relación laboral tradicional (Sin rastros de simulación laboral).\n• Objetivo: Clientes que buscan financiamiento de Modalidad 40.", 50, yPos);
+                    yPos += 65;
+
+                    // Con Costo
+                    doc.setFontSize(11);
+                    doc.setTextColor(234, 88, 12); // orange
+                    doc.setFont("helvetica", "bold");
+                    doc.text("PERFIL CON COSTO", 40, yPos);
+                    yPos += 15;
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("• Clientes de 57 años o menores.\n• Historial con pagos previos de M10 (Trab. independiente o del hogar).\n• Historial con pagos previos de Modalidad 40.\n• Clientes con antecedentes de haber cotizado como Patrón.\n• Casos de simulación laboral o situaciones particulares.", 50, yPos);
+                    yPos += 85;
+
+                    // Step 2
+                    doc.setFontSize(14);
+                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("2. AUDITORÍA HISTORIAL PATRONAL (SINDO)", 40, yPos);
+                    yPos += 20;
+
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "normal");
+                    const step2Txt = "Una vez tomada la asesoría inicial, es estrictamente necesario realizar la revisión del SINDO. Este no es un simple reporte descargable; requiere la obtención de un documento interno del IMSS y un análisis mucho más complejo.";
+                    const splitStep2 = doc.splitTextToSize(step2Txt, 530);
+                    doc.text(splitStep2, 40, yPos);
+                    yPos += (splitStep2.length * 14) + 15;
+
+                    doc.setFontSize(10);
+                    doc.setTextColor(colorGold[0], colorGold[1], colorGold[2]);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("¿Qué buscamos en esta Auditoría?", 50, yPos);
+                    yPos += 15;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("✓ Empresas canceladas (Artículo 251).\n✓ Movimientos generados por Auditoría.\n✓ Fechas de recepción posteriores o anómalas.\n✓ Alteraciones forzadas en el salario base.", 60, yPos);
+                    yPos += 65;
+
+                    // Warning Box
+                    if(yPos > 600) { doc.addPage(); yPos = 40; } 
+                    
+                    doc.setFillColor(254, 242, 242); // rose-50
+                    doc.setDrawColor(225, 29, 72); // rose-600
+                    doc.rect(40, yPos, 530, 160, 'FD'); 
+                    
+                    doc.setFontSize(11);
+                    doc.setTextColor(159, 18, 57); // rose-800
+                    doc.setFont("helvetica", "bold");
+                    doc.text("¿Por qué no usamos el SISEC para tramitar pensiones?", 50, yPos + 25);
+                    
+                    doc.setFontSize(9);
+                    doc.setTextColor(50, 50, 50);
+                    doc.setFont("helvetica", "italic");
+                    const warningTxt = "\"El presente documento no resuelve respecto al derecho a obtener determinada prestación, en virtud de que ello dependerá del tipo de prestación solicitada, el cumplimiento de requisitos administrativos y el esquema de aseguramiento... La información aquí contenida es exclusivamente de carácter informativo.\"";
+                    const splitWarning = doc.splitTextToSize(warningTxt, 510);
+                    doc.text(splitWarning, 50, yPos + 45);
+
+                    const footerTxt = "Si el propio IMSS declara que el SISEC no garantiza ningún derecho, ¿por qué dejaríamos tu futuro en manos de un documento \"exclusivamente informativo\"? Por eso el SINDO es el pilar de RGC.";
+                    const splitFooter = doc.splitTextToSize(footerTxt, 510);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(225, 29, 72); // rose-600
+                    doc.text(splitFooter, 50, yPos + 55 + (splitWarning.length * 12));
+
+                    doc.save(`Asesoria_Paso_a_Paso.pdf`);
+                } catch (error) {
+                    console.error("Error PDF Ruta: ", error);
+                    alert("Error al generar PDF.");
+                }
+            };
+            const toolsList = [
+                { title: 'Vale Inicial Digital', desc: 'Registro general de datos y seguimiento inicial de prospectos.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
+                { title: 'Vale Inicial para Contrato M40', desc: 'Formato específico para clientes que iniciarán Modalidad 40.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
+                { title: 'Vale Inicial para RI', desc: 'Formato especial para Recuperación de Inversión (RI).', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
+                { title: 'Vale Inicial para Pensión Directa', desc: 'Cuestionario para trámites de pensión directa sin M40.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' }
+            ];
+
+            return (
+                <div className="w-full">
+                    {/* Navegación Interna Documentos */}
+                    <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-4 print:hidden">
+                        <button onClick={() => setDocTab('asesoria')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'asesoria' ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <Target className="w-4 h-4" /> Asesoría - Paso a Paso
+                        </button>
+                        <button onClick={() => setDocTab('protocolo')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'protocolo' ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <BookOpen className="w-4 h-4" /> Protocolo y Nomenclatura
+                        </button>
+                        <button onClick={() => setDocTab('generador')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'generador' ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <Type className="w-4 h-4" /> Generador Nombres
+                        </button>
+                        <button onClick={() => setDocTab('listado')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'listado' ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <CheckSquare className="w-4 h-4" /> Listado Cliente
+                        </button>
+                        <button onClick={() => setDocTab('herramientas')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'herramientas' ? 'bg-[#D4AF37] text-[#003366] shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <FolderOpen className="w-4 h-4" /> Herramientas y Vales
+                        </button>
+                    </div>
+
+                    {/* CONTENIDO: LA RUTA RGC (METODOLOGÍA Y COBROS) */}
+                    {docTab === 'asesoria' && (
+                        <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
+                            <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6 print:hidden">
+                                <div>
+                                    <h2 className="text-3xl lg:text-4xl font-black text-[#003366] uppercase tracking-tight">Asesoría - Paso a Paso</h2>
+                                    <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm mt-2 flex items-center gap-2">
+                                        <Scale className="w-5 h-5" /> Metodología, Justificación y Esquema de Análisis
+                                    </p>
+                                </div>
+                                <button onClick={handleDownloadRutaPDF} className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-md hover:bg-[#002244] shrink-0">
+                                    <Download className="w-4 h-4 text-[#D4AF37]" /> Descargar PDF Oficial
+                                </button>
+                            </div>
+
+                            <div className="space-y-8">
+                                <div className="bg-slate-50 border-l-4 border-[#003366] p-6 rounded-2xl">
+                                    <p className="text-lg text-slate-700 font-medium leading-relaxed">
+                                        En <strong className="text-[#003366] font-black">RGC Pensiones y Seguros</strong> no improvisamos con el futuro de nuestros clientes. Muchas personas asumen que tramitar una pensión es "solo un cálculo matemático", pero la realidad es que <span className="text-[#D4AF37] font-black underline decoration-2 underline-offset-4">es un proceso legal y técnico</span>. Esta es la ruta estricta que seguimos para blindar su retiro.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-12 h-12 bg-[#003366] text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg">1</div>
+                                        <h3 className="text-2xl font-black text-[#003366] uppercase tracking-wide">Asesoría Inicial (Base SISEC)</h3>
+                                    </div>
+                                    <p className="text-slate-500 mb-6 pl-16">Es el primer acercamiento. Revisamos la Constancia de Semanas Cotizadas (SISEC) para dar un panorama general. Dependiendo del perfil del cliente, esta asesoría tiene reglas de costo específicas:</p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-0 md:pl-16">
+                                        <div className="bg-emerald-50/50 border border-emerald-200 p-6 rounded-2xl relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-1.5 bg-emerald-500"></div>
+                                            <h4 className="font-black text-emerald-800 uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5" /> Perfil Gratuito (Preferentemente)
+                                            </h4>
+                                            <ul className="space-y-3 text-emerald-900/80 font-medium text-sm">
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-emerald-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Cliente de 58 años en adelante.</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-emerald-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Historial limpio (Sin pagos previos de Modalidad 10 o Modalidad 40).</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-emerald-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Relación laboral tradicional (Sin rastros de simulación laboral).</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-emerald-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Objetivo: Clientes que buscan <strong>financiamiento de Modalidad 40</strong>.</div>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="bg-orange-50/50 border border-orange-200 p-6 rounded-2xl relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-full h-1.5 bg-orange-500"></div>
+                                            <h4 className="font-black text-orange-800 uppercase tracking-widest text-sm mb-4 flex items-center gap-2">
+                                                <AlertCircle className="w-5 h-5" /> Perfil con Costo
+                                            </h4>
+                                            <ul className="space-y-3 text-orange-900/80 font-medium text-sm">
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Clientes de 57 años o menores.</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Historial con pagos previos de M10 (Trabajador independiente o del hogar).</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Historial con pagos previos de Modalidad 40.</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Clientes con antecedentes de haber cotizado como Patrón.</div>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
+                                                    <div>Casos de simulación laboral o situaciones particulares detectadas por el gestor.</div>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-12">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-12 h-12 bg-[#D4AF37] text-[#003366] rounded-2xl flex items-center justify-center font-black text-xl shadow-lg">2</div>
+                                        <h3 className="text-2xl font-black text-[#003366] uppercase tracking-wide">Auditoría Historial Patronal (SINDO)</h3>
+                                    </div>
+                                    <div className="pl-0 md:pl-16">
+                                        <div className="bg-[#003366] p-6 rounded-2xl text-white mb-6 relative overflow-hidden shadow-xl">
+                                            <FileSearch className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 pointer-events-none" />
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <span className="bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-md">Análisis con Costo Obligatorio</span>
+                                            </div>
+                                            <p className="text-slate-300 font-medium leading-relaxed mb-4">
+                                                Una vez tomada la asesoría inicial, <strong>es estrictamente necesario realizar la revisión del SINDO</strong>. Este no es un simple reporte descargable; requiere la obtención de un documento interno del IMSS y un análisis mucho más complejo que un simple "cálculo de pensión".
+                                            </p>
+                                            <div className="bg-white/10 p-4 rounded-xl border border-white/20">
+                                                <h4 className="font-black text-[#D4AF37] uppercase text-xs tracking-widest mb-2">¿Qué buscamos en esta Auditoría?</h4>
+                                                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-200">
+                                                    <li>✓ Empresas canceladas (Artículo 251).</li>
+                                                    <li>✓ Movimientos generados por Auditoría.</li>
+                                                    <li>✓ Fechas de recepción posteriores o anómalas.</li>
+                                                    <li>✓ Alteraciones forzadas en el salario base.</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-rose-50 border-2 border-rose-200 p-6 rounded-2xl shadow-sm">
+                                            <h3 className="text-xl font-black text-rose-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                                <Siren className="w-6 h-6 text-rose-600" /> ¿Por qué no usamos el SISEC para tramitar pensiones?
+                                            </h3>
+                                            <p className="text-rose-900 font-medium mb-4">
+                                                La gente desconoce la importancia del SINDO porque no están familiarizados con los documentos. Pero la respuesta a "¿Por qué hacer este análisis?" <strong>está escrita explícitamente en las letras pequeñas del propio documento del IMSS (SISEC):</strong>
+                                            </p>
+                                            
+                                            <blockquote className="bg-white border-l-4 border-rose-500 p-5 rounded-r-xl shadow-sm text-slate-700 italic font-medium leading-relaxed relative">
+                                                <div className="absolute top-2 left-2 text-rose-200 opacity-50 text-4xl font-serif">"</div>
+                                                <p className="mb-3 relative z-10">
+                                                    "El presente documento <span className="font-bold text-rose-700 bg-rose-100 px-1">no resuelve respecto al derecho a obtener determinada prestación</span>, en virtud de que ello dependerá del tipo de prestación solicitada, el cumplimiento de requisitos administrativos y el esquema de aseguramiento..."
+                                                </p>
+                                                <p className="relative z-10">
+                                                    "La información aquí contenida es <span className="font-bold text-rose-700 bg-rose-100 px-1">exclusivamente de carácter informativo.</span>"
+                                                </p>
+                                            </blockquote>
+
+                                            <div className="mt-5 bg-rose-800 text-white p-4 rounded-xl font-bold text-center">
+                                                Si el propio IMSS declara que el SISEC no garantiza ningún derecho, ¿por qué dejaríamos tu futuro en manos de un documento "exclusivamente informativo"? Por eso el SINDO es el pilar de RGC.
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CONTENIDO: PROTOCOLO */}
+                    {docTab === 'protocolo' && (
+                        <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200 print:hidden">
+                            <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6">
+                                <div>
+                                    <h2 className="text-3xl lg:text-4xl font-black text-[#003366] uppercase tracking-tight">Manual de Integración</h2>
+                                    <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm mt-2 flex items-center gap-2">
+                                        <ShieldCheck className="w-5 h-5" /> Reglas Oficiales de Expedientes RGC
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    <button onClick={handleDownloadFolders} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-sm">
+                                        <DownloadCloud className="w-4 h-4" /> Plantilla ZIP
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-12 text-sm leading-relaxed">
+                                <div className="bg-gradient-to-r from-[#003366] to-[#004080] p-6 lg:p-8 rounded-3xl text-white shadow-lg relative overflow-hidden">
+                                    <ShieldCheck className="absolute -right-6 -top-6 w-48 h-48 text-white opacity-5" />
+                                    <div className="relative z-10">
+                                        <h3 className="text-[#D4AF37] font-black uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4" /> Objetivo Crítico
+                                        </h3>
+                                        <p className="text-base lg:text-lg font-medium text-white/90 max-w-3xl leading-relaxed">
+                                            Blindar la información técnica y legal del cliente. Este protocolo elimina el envío de documentos por WhatsApp, minimiza errores de captura y garantiza el orden inmaculado de la documentación.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xl font-black text-[#003366] uppercase tracking-wide mb-6 flex items-center gap-3">
+                                        <Siren className="w-6 h-6 text-rose-500" /> Sanciones y Políticas
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                        <div className="bg-rose-50/50 border border-rose-200 p-6 rounded-2xl hover:shadow-md transition-shadow">
+                                            <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center mb-4">
+                                                <Ban className="w-5 h-5 text-rose-600" />
+                                            </div>
+                                            <h4 className="font-black text-rose-800 uppercase mb-2">1. Rechazo Inmediato</h4>
+                                            <p className="text-rose-700/80 font-medium">Todo documento mal nombrado, borroso, fuera de su carpeta o incompleto será marcado automáticamente como "NO ENTREGADO".</p>
+                                        </div>
+                                        <div className="bg-orange-50/50 border border-orange-200 p-6 rounded-2xl hover:shadow-md transition-shadow">
+                                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                                                <FileWarning className="w-5 h-5 text-orange-600" />
+                                            </div>
+                                            <h4 className="font-black text-orange-800 uppercase mb-2">2. Cero "Basura Digital"</h4>
+                                            <p className="text-orange-700/80 font-medium">Prohibido cargar archivos con nombres genéricos (ej. <i>"WhatsApp Image"</i>, <i>"Copia de..."</i>, <i>"Scan001"</i>).</p>
+                                        </div>
+                                        <div className="bg-[#003366]/5 border border-[#003366]/20 p-6 rounded-2xl hover:shadow-md transition-shadow relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-2 h-full bg-[#003366]"></div>
+                                            <div className="w-10 h-10 bg-[#003366]/10 rounded-full flex items-center justify-center mb-4">
+                                                <AlertTriangle className="w-5 h-5 text-[#003366]" />
+                                            </div>
+                                            <h4 className="font-black text-[#003366] uppercase mb-2">3. Impacto en Comisiones</h4>
+                                            <p className="text-slate-600 font-medium">El pago de comisiones queda <b>CONGELADO automáticamente</b> si el expediente digital no está al 100% bajo estos estándares.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xl font-black text-[#003366] uppercase tracking-wide mb-6 flex items-center gap-3">
+                                        <ScanLine className="w-6 h-6 text-[#D4AF37]" /> Estándares Técnicos
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex items-start gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                            <XCircle className="w-6 h-6 text-rose-500 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-1">Cero Celulares</h4>
+                                                <p className="text-slate-500 text-sm">Prohibidas las fotos (salvo Evidencia Carpeta 11). Usar escáner de oficina. Sin fondos informales, camas o manos visibles.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                            <Eye className="w-6 h-6 text-[#003366] shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-1">Calidad y Reflejos</h4>
+                                                <p className="text-slate-500 text-sm">Visibilidad total del documento. Sin reflejos de flash, sombras pronunciadas. Deben apreciarse claramente los 4 bordes del papel.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                            <FileText className="w-6 h-6 text-[#D4AF37] shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-1">Regla PDF Único</h4>
+                                                <p className="text-slate-500 text-sm">Un documento de varias hojas = 1 solo PDF. Múltiples versiones (ej. 2 actas distintas) = PDFs separados.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                                            <History className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-1">Obligación de Actualizar</h4>
+                                                <p className="text-slate-500 text-sm">El asesor es responsable de cargar nuevos reportes inmediatamente al cambiar un estatus (M40, Baja, Desempleo).</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xl font-black text-[#003366] uppercase tracking-wide mb-6 flex items-center gap-3">
+                                        <FolderOpen className="w-6 h-6 text-[#D4AF37]" /> Estructura Obligatoria de Carpetas
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {[
+                                            { num: '0', title: 'SISEC', desc: 'Distinguir: DIGITAL (Limpio) o CON ANOTACIONES (Trabajado). No borrar históricos.', nom: 'SISEC [TIPO] - [NOMBRE] - [FECHA] - [ESTATUS]' },
+                                            { num: '1', title: 'ACTA DE NACIMIENTO', desc: 'Transcripción literal (incluso errores). Si falta apellido usar "X". Formato actual obligatorio + antiguas.', nom: 'ACTA DE NACIMIENTO - [NOMBRE] - [FECHA EXP] - [OBS]' },
+                                            { num: '2', title: 'INE', desc: 'Escaneo 100% tamaño, ambos lados en 1 hoja. Validación en archivo aparte obligatoria.', nom: 'INE - [NOMBRE] - VIGENCIA [AÑO] - [OBS]' },
+                                            { num: '3', title: 'CURP', desc: 'PDF con QR. Copiar y Pegar los 18 dígitos. Mayúsculas si hay error o asociada.', nom: 'CURP - [NOMBRE] - [CLAVE 18] - [CERTIFICADA/NO]' },
+                                            { num: '4', title: 'ESTADO DE CUENTA AFORE', desc: 'Suma Obligatoria (SAR92+Ret97+Vol+Viv). PDF Completo. Definir periodo.', nom: 'EDO CTA AFORE - [NOMBRE] - [AFORE] - [PERIODO] - [TOTAL $]' },
+                                            { num: '5', title: 'BANCO (NIVEL 4)', desc: 'BBVA o Inbursa. 2 Archivos: Edo Cta (CLABE) + Carátula Contrato (Nivel 4).', nom: 'EDO CTA BANCARIO - [NOMBRE] - [BANCO] - [CLABE] - [ESTATUS]' },
+                                            { num: '6', title: 'CONSTANCIA FISCAL', desc: 'Vigilar cruce de Código Postal con el comprobante de domicilio.', nom: 'CONSTANCIA FISCAL - [NOMBRE] - [RFC] - [FECHA] - [OBS]' },
+                                            { num: '7', title: 'COMPROBANTE DOMICILIO', desc: 'Vigencia menor a 3 meses. Cotejar dirección exacta contra el INE.', nom: 'COMPROBANTE DOMICILIO - [NOMBRE] - [PROVEEDOR] - [FECHA] - [COINCIDE INE?]' },
+                                            { num: '8', title: 'MATRIMONIO / BENEFICIARIOS', desc: 'Reciente. Si es Beneficiario Afore, debe ser el mismo que el Responsable Solidario.', nom: '[TIPO DOC] - [TITULAR] - [BENEFICIARIO] - [FECHA] - [VINCULACION]' },
+                                            { num: '9', title: 'OBLIGADO SOLIDARIO', desc: 'Regla Espejo: Mismos documentos que el titular (Acta, INE, CURP, CSF, Domicilio).', nom: '[DOC] (OBLIGADO) - [NOMBRE] - [DETALLES]', highlight: 'rose' },
+                                            { num: '10', title: 'CONTRATO FIRMADO', desc: 'Escanear TODAS las hojas. Firmas y Huellas de Titular, Obligado y RGC.', nom: 'CONTRATO - [NOMBRE] - [FECHA] - [FIRMADO COMPLETO]' },
+                                            { num: '11', title: 'EVIDENCIA (FOTOS)', desc: 'Fotos del ACTO de firmar y poner huellas (Titular y Obligado). Foto cenital de pagaré.', nom: 'FOTO FIRMA [DOC] - [TITULAR/OBLIGADO]' }
+                                        ].map((item) => (
+                                            <div key={item.num} className={`flex flex-col lg:flex-row gap-5 p-5 rounded-2xl border transition-all hover:shadow-md ${item.highlight === 'rose' ? 'bg-rose-50/40 border-rose-200' : 'bg-white border-slate-200 hover:border-[#003366]/30'}`}>
+                                                <div className="flex items-start gap-4 flex-1">
+                                                    <div className={`shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl font-black text-lg ${item.highlight === 'rose' ? 'bg-rose-600 text-white shadow-rose-200' : 'bg-[#003366] text-white shadow-[#003366]/20'} shadow-lg`}>
+                                                        {item.num}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className={`font-black text-lg uppercase tracking-tight mb-1 ${item.highlight === 'rose' ? 'text-rose-800' : 'text-[#003366]'}`}>{item.title}</h4>
+                                                        <p className="text-slate-600 font-medium text-sm leading-relaxed max-w-xl">{item.desc}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="lg:w-[400px] shrink-0 flex flex-col justify-center bg-slate-50 rounded-xl p-3 border border-slate-200/60 relative group">
+                                                    <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold mb-1 block">Nomenclatura Oficial</span>
+                                                    <code className="font-mono text-xs text-[#003366] font-bold block pr-8 leading-tight">
+                                                        {item.nom}
+                                                    </code>
+                                                    <button 
+                                                        onClick={() => {
+                                                            copyToClipboard(item.nom);
+                                                            if(showToast) showToast('¡Nomenclatura copiada!');
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-[#D4AF37] hover:border-[#D4AF37] opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                                        title="Copiar Nomenclatura"
+                                                    >
+                                                        <Copy className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-xl font-black text-[#003366] uppercase tracking-wide mb-6 flex items-center gap-3">
+                                        <Briefcase className="w-6 h-6 text-[#D4AF37]" /> Carpeta: "Otros Documentos" (Soporte)
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[
+                                            { letter: 'A', title: 'ESTRATEGIA', desc: 'Proyección aceptada y firmada. Autorizada por Dirección.', nom: 'ESTRATEGIA - [NOMBRE] - [ESCENARIO] - [FECHA]' },
+                                            { letter: 'B', title: 'HISTORIAL PATRONAL', desc: 'Doc oficial para cruce de reingresos/bajas.', nom: 'HISTORIAL PATRONAL - [FECHA] - [OBSERVACIONES]' },
+                                            { letter: 'C', title: 'INFONAVIT', desc: 'Historial para ver créditos o amortizaciones.', nom: 'HISTORIAL INFONAVIT - [FECHA] - [OBSERVACIONES]' },
+                                            { letter: 'D', title: 'COMPARA DATOS', desc: 'Cruce Afore vs IMSS/RENAPO (Diagnóstico).', nom: 'COMPARA DATOS - [NOMBRE] - [FECHA] - [ERROR/SIN ERROR]' },
+                                            { letter: 'E', title: 'HOJAS ROSAS', desc: 'Afiliaciones 70s-90s. Alto contraste obligatorio.', nom: 'HOJA ROSA - [NOMBRE] - [PATRON] - [FECHA]' },
+                                            { letter: 'F', title: 'NÓMINA', desc: 'Evidencia financiera (Auditorías/Simulación).', nom: 'NOMINA - [NOMBRE] - [PATRON] - [PERIODO] - [OBS]' },
+                                            { letter: 'G', title: 'RESOLUCIONES', desc: 'Respuesta oficial de trámites (Corrección, Unificación).', nom: 'RESOLUCION - [NOMBRE] - [TRAMITE] - [FECHA] - [STATUS]' },
+                                            { letter: 'H', title: 'SINAVID', desc: 'Historial ISSSTE (Solo Portabilidad).', nom: 'SINAVID - [NOMBRE] - [FECHA] - [ESTATUS]' },
+                                            { letter: 'I', title: 'EXCEPCIONES', desc: 'Docs atípicos (Juicios). Requiere Autorización Dirección.', nom: '(Sigue estándar general con nombre autorizado)', highlight: 'violet' }
+                                        ].map((item) => (
+                                            <div key={item.letter} className={`flex flex-col gap-3 p-5 rounded-2xl border transition-all ${item.highlight === 'violet' ? 'bg-violet-50/40 border-violet-200' : 'bg-white border-slate-200 hover:border-[#003366]/30'}`}>
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-lg font-black text-sm ${item.highlight === 'violet' ? 'bg-violet-600 text-white' : 'bg-[#D4AF37] text-[#003366]'}`}>
+                                                        {item.letter}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className={`font-black text-sm uppercase tracking-tight mb-0.5 ${item.highlight === 'violet' ? 'text-violet-800' : 'text-[#003366]'}`}>{item.title}</h4>
+                                                        <p className="text-slate-500 font-medium text-xs leading-relaxed">{item.desc}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-200/60 mt-auto flex items-center justify-between group">
+                                                    <code className={`font-mono text-[10px] font-bold ${item.highlight === 'violet' ? 'text-violet-700' : 'text-[#003366]'}`}>
+                                                        {item.nom}
+                                                    </code>
+                                                    <button 
+                                                        onClick={() => { copyToClipboard(item.nom); if(showToast) showToast('¡Nomenclatura copiada!'); }}
+                                                        className="p-1.5 bg-white border border-slate-200 rounded text-slate-400 hover:text-[#D4AF37] opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CONTENIDO: GENERADOR DE NOMBRES */}
+                    {docTab === 'generador' && (
+                        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 print:hidden">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                                <div>
+                                    <h2 className="text-3xl font-black text-[#003366] uppercase tracking-tight">Generador de Nomenclatura</h2>
+                                    <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm mt-1">Nombra o renombra PDFs automáticamente</p>
+                                </div>
+                                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                                    <div className="relative flex-1 md:w-80">
+                                        <input 
+                                            type="text" 
+                                            placeholder="NOMBRE DEL CLIENTE..." 
+                                            className="w-full border-2 border-[#003366]/20 rounded-xl px-4 py-3 text-sm font-black uppercase tracking-wide focus:outline-none focus:border-[#003366] bg-slate-50"
+                                            value={clientName}
+                                            onChange={(e) => setClientName(e.target.value.toUpperCase())}
+                                        />
+                                        <Users className="w-5 h-5 absolute right-4 top-3.5 text-slate-400" />
+                                    </div>
+                                    <button 
+                                        onClick={handleDownloadAllCustomFolders}
+                                        className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#002244] transition-all flex items-center justify-center gap-2 shadow-md shrink-0"
+                                        title="Descarga un archivo ZIP con todas las carpetas vacías nombradas específicamente para este cliente"
+                                    >
+                                        <DownloadCloud className="w-4 h-4"/> Descargar Todas (.ZIP)
+                                    </button>
+                                </div>
+                            </div>
+
+                            {!clientName ? (
+                                <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
+                                    <Type className="w-12 h-12 text-slate-300 mb-4" />
+                                    <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest mb-2">Esperando Cliente</h3>
+                                    <p className="text-slate-500 text-sm max-w-md">Escribe el nombre del cliente en el recuadro superior para generar las cajas de arrastre de PDFs y las nomenclaturas exactas.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {docsConfig.map((doc, idx) => {
+                                        
+                                        let finalName = `${doc.prefijo} - ${clientName}`;
+                                        let missingVars = [];
+                                        
+                                        doc.vars.forEach(v => {
+                                            const val = docVars[`${doc.id}_${v}`];
+                                            if (val && val.trim() !== '') {
+                                                finalName += ` - ${val.trim().toUpperCase()}`;
+                                            } else {
+                                                finalName += ` - [${v}]`;
+                                                missingVars.push(v);
+                                            }
+                                        });
+
+                                        const isComplete = missingVars.length === 0;
+
+                                        const handleDrop = (e) => {
+                                            e.preventDefault();
+                                            setDraggedDoc(null);
+                                            const file = e.dataTransfer.files[0];
+                                            if (!file) return;
+                                            
+                                            if (file.type !== 'application/pdf') {
+                                                alert('Solo se permiten archivos PDF.');
+                                                return;
+                                            }
+
+                                            const blob = new Blob([file], { type: 'application/pdf' });
+                                            const link = document.createElement('a');
+                                            link.href = URL.createObjectURL(blob);
+                                            link.download = `${finalName}.pdf`;
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                            if(showToast) showToast(`Archivo renombrado: ${finalName}.pdf`);
+                                        };
+
+                                        const handleDownloadSingleFolder = () => {
+                                            const zip = new window.JSZip();
+                                            zip.folder(finalName);
+                                            zip.generateAsync({type:"blob"}).then(function(content) {
+                                                const link = document.createElement('a');
+                                                link.href = URL.createObjectURL(content);
+                                                link.download = `${finalName}.zip`;
+                                                link.click();
+                                            });
+                                            if(showToast) showToast(`Carpeta descargada`);
+                                        };
+
+                                        return (
+                                            <div 
+                                                key={idx} 
+                                                className={`relative p-5 rounded-2xl border-2 transition-all flex flex-col h-full ${isComplete ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-200 bg-white hover:border-[#D4AF37]'}`}
+                                                onDragOver={(e) => { e.preventDefault(); setDraggedDoc(doc.id); }}
+                                                onDragLeave={() => setDraggedDoc(null)}
+                                                onDrop={handleDrop}
+                                            >
+                                                {draggedDoc === doc.id && (
+                                                    <div className="absolute inset-0 bg-[#003366]/90 rounded-2xl z-10 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                                                        <FileUp className="w-10 h-10 mb-2 animate-bounce" />
+                                                        <span className="font-black text-sm tracking-widest uppercase">Soltar para Renombrar</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-widest">{doc.prefijo}</span>
+                                                    {isComplete ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
+                                                </div>
+
+                                                <p className="font-mono text-xs text-slate-700 font-bold leading-relaxed mb-4 break-all h-12 overflow-hidden" title={finalName + '.pdf'}>
+                                                    {finalName}
+                                                </p>
+
+                                                <div className="space-y-2 mb-4">
+                                                    {doc.vars.map(v => (
+                                                        <input 
+                                                            key={v}
+                                                            type="text" 
+                                                            placeholder={v.includes('FECHA') ? '**/**/****' : v}
+                                                            className={`w-full text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg border focus:outline-none ${docVars[`${doc.id}_${v}`] ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600 focus:border-[#D4AF37]'}`}
+                                                            value={docVars[`${doc.id}_${v}`] || ''}
+                                                            onChange={(e) => {
+                                                                let val = e.target.value;
+                                                                if (v.includes('FECHA')) {
+                                                                    val = val.replace(/[^0-9/]/g, '');
+                                                                    if (val.length === 2 && !val.includes('/')) val += '/';
+                                                                    if (val.length === 5 && val.split('/').length === 2) val += '/';
+                                                                    if (val.length > 10) val = val.substring(0, 10);
+                                                                }
+                                                                setDocVars({...docVars, [`${doc.id}_${v}`]: val})
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+
+                                                <div className="flex flex-col gap-2 mt-auto pt-3 border-t border-slate-100">
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest text-center w-full block ${isComplete ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                        {isComplete ? 'Listo para arrastrar PDF o copiar' : `Faltan: ${missingVars.join(', ')}`}
+                                                    </span>
+                                                    <div className="flex items-center gap-2 w-full mt-1">
+                                                        <button 
+                                                            onClick={handleDownloadSingleFolder}
+                                                            className="text-[10px] bg-slate-100 hover:bg-[#003366] hover:text-white text-slate-600 font-black uppercase tracking-widest px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                                            title="Descargar solo esta carpeta (.zip)"
+                                                        >
+                                                            <FolderOpen className="w-3.5 h-3.5"/> ZIP
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                copyToClipboard(finalName);
+                                                                if(showToast) showToast('Nombre copiado');
+                                                            }}
+                                                            className="text-[10px] flex-1 bg-slate-100 hover:bg-[#003366] hover:text-white text-slate-600 font-black uppercase tracking-widest px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" /> Copiar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* CONTENIDO: LISTADO (IMAGEN RECREADA) */}
+                    {docTab === 'listado' && (
+                        <div className="flex flex-col items-center">
+                            <button onClick={() => window.print()} className="mb-6 bg-[#003366] text-white px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-md hover:bg-[#002244] print:hidden">
+                                <Printer className="w-4 h-4" /> Imprimir Listado para Cliente
+                            </button>
+                            
+                            <div className="bg-white p-10 md:p-14 rounded-none shadow-2xl max-w-3xl w-full relative overflow-hidden print:shadow-none print:p-0" style={{aspectRatio: '1 / 1.414'}}>
+                                {/* Marca de agua simulada */}
+                                <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+                                    <span className="text-[25rem] font-black text-[#003366] select-none tracking-tighter leading-none -rotate-12">RGC</span>
+                                </div>
+
+                                <div className="relative z-10 h-full flex flex-col">
+                                    <div className="flex justify-between items-start mb-10">
+                                        <div>
+                                            <h1 className="text-3xl md:text-4xl font-black text-[#003366] leading-tight tracking-tight">RGC PENSIONES Y SEGUROS</h1>
+                                            <h2 className="text-xl md:text-2xl font-bold text-[#003366] mt-1 tracking-wide">DOCUMENTOS PARA PENSIONARTE</h2>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-5xl font-black text-[#003366] tracking-tighter block leading-none">RGC</span>
+                                            <span className="text-[10px] font-black uppercase text-[#D4AF37] tracking-widest block">Pensiones & Seguros</span>
+                                            <span className="text-[8px] text-slate-500 block mt-0.5">Construyendo tu Futuro</span>
+                                        </div>
+                                    </div>
+
+                                    <ul className="text-base md:text-lg text-slate-800 space-y-3 font-medium tracking-wide">
+                                        <li>1. ACTA DE NACIMIENTO (certificada)</li>
+                                        <li>2. INE (vigente)</li>
+                                        <li>3. CURP</li>
+                                        <li>4. ESTADO DE CUENTA DE LA AFORE</li>
+                                        <li>5. ESTADO DE CUENTA BANCARIO (con clabe interbancaria)</li>
+                                        <li>6. CONSTANCIA DE SITUACION FISCAL (RFC)</li>
+                                        <li>7. COMPROBANTE DE DOMICILIO (no mayor a 3 meses)</li>
+                                        <li>8. HOJA DE BENEFICIARIOS DEL AFORE ó TESTAMENTO EN CASO DE HERMANOS.</li>
+                                        <li>9. CORREO ELECTRONICO.</li>
+                                    </ul>
+
+                                    <h3 className="text-xl md:text-2xl font-black text-[#003366] mt-8 mb-4">SI TIENE ESPOSA</h3>
+                                    <ul className="text-base md:text-lg text-slate-800 space-y-3 font-medium tracking-wide">
+                                        <li>1. ACTA DE NACIMIENTO (certificada)</li>
+                                        <li>2. INE (vigente)</li>
+                                        <li>3. CURP</li>
+                                        <li>4. CONSTANCIA DE SITUACION FISCAL (RFC)</li>
+                                        <li>5. ACTA DE MATRIMONIO</li>
+                                    </ul>
+
+                                    <div className="mt-auto pt-10 text-sm md:text-base text-slate-800 leading-relaxed font-medium">
+                                        <p className="mb-4">** Todos los pagos se efectuaran directamente en la oficina ubicada en Eje Central Lazaro Cardenas 555, narvarte poniente, Benito Juarez, 03023 CDMX o en los siguientes:</p>
+                                        
+                                        <div className="space-y-1 mb-6">
+                                            <p className="font-black text-lg">Cuenta: 1581571653</p>
+                                            <p className="font-black text-lg">CLABE INTERBANCARIA: 012180015815716534</p>
+                                            <p className="font-black text-lg">Titular: Alma Guadalupe Cano Perez</p>
+                                        </div>
+
+                                        <p>Todo pago que no cumpla con estas especificaciones no nos hacemos responsables de los tramites ofrecidos.</p>
+                                    </div>
+
+                                    <div className="absolute bottom-0 left-0 w-full h-4 flex">
+                                        <div className="h-full bg-[#D4AF37] flex-1"></div>
+                                        <div className="h-full bg-[#003366] w-32"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CONTENIDO: HERRAMIENTAS Y VALES */}
+                    {docTab === 'herramientas' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
+                            
+                            {toolsList.map((vale, i) => (
+                                <div key={i} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                                    <div className="bg-[#003366]/10 p-5 rounded-2xl mb-5">
+                                        <ExternalLink className="w-10 h-10 text-[#003366]" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-[#003366] mb-2 leading-tight">{vale.title}</h3>
+                                    <p className="text-slate-500 mb-8 text-sm">{vale.desc}</p>
+                                    <a 
+                                        href={vale.link} 
+                                        target="_blank" rel="noreferrer"
+                                        className="w-full mt-auto bg-[#003366] text-white px-6 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#002244] hover:-translate-y-1 transition-all shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        Abrir Vale <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            ))}
+
+                            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col items-center">
+                                <div className="flex items-center gap-3 mb-6 self-start w-full">
+                                    <Video className="w-6 h-6 text-[#D4AF37]" />
+                                    <h3 className="text-xl font-black text-[#003366]">Tutorial: Descarga SISEC</h3>
+                                </div>
+                                <div className="w-full max-w-[260px] rounded-2xl overflow-hidden relative shadow-lg bg-slate-900 mx-auto" style={{ aspectRatio: '9/16' }}>
+                                    <iframe 
+                                        src="https://www.youtube.com/embed/Z2EhzBjthsc" 
+                                        title="Tutorial SISEC RGC"
+                                        className="w-full h-full border-0 absolute top-0 left-0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        allowFullScreen>
+                                    </iframe>
+                                </div>
+                                <a 
+                                    href="https://youtube.com/shorts/Z2EhzBjthsc" 
+                                    target="_blank" rel="noreferrer"
+                                    className="mt-6 text-[11px] font-black uppercase tracking-widest text-[#003366] hover:text-[#D4AF37] transition-colors flex items-center gap-1.5 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200"
+                                >
+                                    Abrir en YouTube <ExternalLink className="w-3 h-3" />
+                                </a>
+                            </div>
+
+                            <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                                <div className="bg-emerald-50 p-5 rounded-2xl mb-5">
+                                    <Cloud className="w-10 h-10 text-emerald-600" />
+                                </div>
+                                <h3 className="text-xl font-black text-[#003366] mb-2 leading-tight">Drive de Ventas</h3>
+                                <p className="text-slate-500 mb-8 text-sm">Acceda al repositorio oficial en Google Drive con material, presentaciones y formatos comerciales de RGC.</p>
+                                <a 
+                                    href="https://drive.google.com/" 
+                                    target="_blank" rel="noreferrer"
+                                    className="w-full mt-auto bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-1 transition-all shadow-lg flex items-center justify-center gap-2"
+                                >
+                                    Abrir Drive <ExternalLink className="w-4 h-4" />
+                                </a>
+                            </div>
+
+                        </div>
+                    )}
+                </div>
+            );
         };
 
         const App = () => {
@@ -269,10 +1205,23 @@
         const [sindoPassword, setSindoPassword] = useState('');
         const [sindoAuthError, setSindoAuthError] = useState(false);
 
+        // --- SISTEMA DE TOASTS ---
+        const [toasts, setToasts] = useState([]);
+        const showToast = (message, type = 'success') => {
+            const id = Date.now();
+            setToasts(prev => [...prev, { id, message, type }]);
+            setTimeout(() => {
+                setToasts(prev => prev.filter(t => t.id !== id));
+            }, 3000);
+        };
+
+        // --- PUENTE A CALCULADORA ---
+        const [calcDataBridge, setCalcDataBridge] = useState(null);
+
         useEffect(() => {
             const styleSheet = document.createElement("style");
             styleSheet.type = "text/css";
-            styleSheet.innerText = printStyles;
+            styleSheet.innerText = customStyles;
             document.head.appendChild(styleSheet);
             return () => {
                 if (document.head.contains(styleSheet)) {
@@ -283,9 +1232,65 @@
 
         const triggerNativePrint = () => { window.print(); };
 
+        // --- LECTURA NATIVA DE PDF ---
+        const handleFileUpload = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.type !== 'application/pdf') {
+                showToast('Por favor, sube un archivo PDF válido', 'error');
+                return;
+            }
+            
+            showToast('Procesando PDF SISEC...', 'success');
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await window.pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                let fullText = '';
+                
+                for(let i=1; i<=pdf.numPages; i++){
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    const items = textContent.items.map(item => ({
+                        str: item.str,
+                        x: item.transform[4],
+                        y: item.transform[5]
+                    }));
+
+                    items.sort((a, b) => {
+                        if (Math.abs(a.y - b.y) > 5) {
+                            return b.y - a.y; 
+                        }
+                        return a.x - b.x; 
+                    });
+
+                    let lastY = null;
+                    let pageText = '';
+                    items.forEach(item => {
+                        if (lastY !== null && Math.abs(lastY - item.y) > 5) {
+                            pageText += '\n';
+                        }
+                        pageText += item.str + ' ';
+                        lastY = item.y;
+                    });
+                    fullText += pageText + '\n\n';
+                }
+                
+                setRawSisec(fullText);
+                showToast('PDF extraído exitosamente', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast('Error al leer el documento PDF', 'error');
+            }
+            
+            e.target.value = null;
+        };
+
         const handleDownloadPDF = () => {
             if (!parsedData) return;
             setIsGeneratingPDF(true);
+            showToast('Generando Dictamen en PDF...', 'success');
             
             setTimeout(() => {
                 try {
@@ -366,11 +1371,7 @@
                     yPos += 20;
 
                     parsedData.grouped.forEach((group, idx) => {
-                        // Salto de página preventivo
-                        if (yPos > 650) { 
-                            doc.addPage(); 
-                            yPos = 40; 
-                        }
+                        if (yPos > 650) { doc.addPage(); yPos = 40; }
 
                         doc.setFontSize(11);
                         doc.setFont("helvetica", "bold");
@@ -387,7 +1388,6 @@
                         doc.text(subHeader, 40, yPos);
                         yPos += 10;
 
-                        // Preparar datos de la tabla
                         const tableBody = group.movements.map(mov => {
                             const tipoIni = TIPO_MAP[mov.tipoIni] || mov.tipoIni;
                             const origenIni = ORIGEN_MAP[mov.origenIni] || mov.origenIni;
@@ -422,18 +1422,8 @@
                             head: [['Fecha Efectiva', 'Movimiento (Inicio)', 'Salario', 'Cierre / Baja', 'Observaciones']],
                             body: tableBody,
                             theme: 'grid',
-                            headStyles: { 
-                                fillColor: colorPrimary, 
-                                textColor: [255, 255, 255], 
-                                fontSize: 8, 
-                                fontStyle: 'bold',
-                                halign: 'center'
-                            },
-                            bodyStyles: { 
-                                fontSize: 8, 
-                                valign: 'middle',
-                                textColor: [50, 50, 50]
-                            },
+                            headStyles: { fillColor: colorPrimary, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold', halign: 'center' },
+                            bodyStyles: { fontSize: 8, valign: 'middle', textColor: [50, 50, 50] },
                             columnStyles: {
                                 0: { cellWidth: 70, halign: 'center', fontStyle: 'bold' },
                                 1: { cellWidth: 140 },
@@ -442,17 +1432,14 @@
                                 4: { cellWidth: 'auto' }
                             },
                             didParseCell: function(data) {
-                                if (data.section === 'body') {
-                                    if (data.column.index === 4 && data.cell.raw !== 'Trámite Regular') {
-                                        data.cell.styles.textColor = colorRed;
-                                        data.cell.styles.fontStyle = 'bold';
-                                        data.cell.styles.fillColor = [254, 242, 242]; // red-50
-                                    }
+                                if (data.section === 'body' && data.column.index === 4 && data.cell.raw !== 'Trámite Regular') {
+                                    data.cell.styles.textColor = colorRed;
+                                    data.cell.styles.fontStyle = 'bold';
+                                    data.cell.styles.fillColor = [254, 242, 242]; // red-50
                                 }
                             },
                             margin: { left: 40, right: 40 }
                         });
-
                         yPos = doc.lastAutoTable.finalY + 25;
                     });
                     
@@ -536,9 +1523,10 @@
                     }
 
                     doc.save(`Dictamen_RGC_${parsedData.personal?.nss || 'Auditoria'}.pdf`);
+                    showToast('PDF descargado exitosamente', 'success');
                 } catch (error) {
                     console.error("Error al generar PDF: ", error);
-                    alert("Ocurrió un error al generar el PDF nativo. Verifique la consola.");
+                    showToast('Ocurrió un error al generar el PDF', 'error');
                 } finally {
                     setIsGeneratingPDF(false);
                 }
@@ -580,76 +1568,18 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            showToast('Archivo CSV descargado', 'success');
         };
 
-        const loadExampleData = () => {
-            const exampleSindo = `
-PPCDQ002 CONSULTA ALFABETICA DEL CATALOGO NACIONAL DE ASEGURADOS 18/02/2026
-PAGINA : 0001 CICS PRODUCCION 06:22:29
-APELLIDO PATERNO: ARZATE
-APELLIDO MATERNO: BERLIOZ
-NOMBRE : VERONICA QUIONIA GUILLERMINA
-NUM.SEG.SOC. D S
-NOMBRE DEL ASEGURADO DL AS AN SEC. V X MES LUGAR
-ARZATE-BERLIOZ-VERONICA QUIONIA GUILLERMINA 8880630232 - 4 2 F ABR E.MEX
---------------------------------------------------------------------------------
-S.IN.D.O. SP01M CONSULTA NUMERICA DE PATRONES 18/02/2026
-CICS01SS
-REGISTRO PATRONAL Y669999940 - 2 CURP/RFC /
-NOMBRE
-CONTINUACION VOLUNTARIA EN EL REGIMEN OBLIGATORIO
-FECHA DE MOVIMIENTO 01/07/1997 TIPO DE MOVIMIENTO 1
---------------------------------------------------------------------------------
-S.IN.D.O. SP01M CONSULTA NUMERICA DE PATRONES 18/02/2026
-CICS01SS
-REGISTRO PATRONAL C602404910 - 1 CURP/RFC /
-NOMBRE
-RESTAURANTES IZY DE MEXICO
-FECHA DE MOVIMIENTO 01/01/2018 TIPO DE MOVIMIENTO 2
-CAUSA DE BAJA ART. 251 DE LA LEY DEL S.S. S.S.F. 0
---------------------------------------------------------------------------------
-S.IN.D.O. SB03M CONSULTA DE CUENTA INDIVIDUAL 18/02/2026
-NUM. DE SEG. SOC. 0184630301 - 2 REGISTRO PATRONAL 9999999999
-ASEG. ARZATE-BERLIOZ-VERONICA QUIONIA GUILLERMINA CICS01SS
-CURP AABV630403MMCRRR02
----------INICIO---------- SALARIO SEM SUP ----FINAL----- T I
-DEL REG.PAT. F.RECEP. O T FECHA Y TIPO JOR EX SRV O T FECHA T S
-40 Y6699999402 29/10/2025 0 8 02/10/2022 1700.00 F 0 SI NO 9 2 31/10/2025
-16 C6024049101 01/07/2017 4 8 01/07/2017 230.76 F 0 NO NO 4 2 01/09/2017 1
-`;
-            
-            const exampleSisec = `
-BATANA CALLEJA MARCELO NSS: 88806302324
-CURP: BACM630814HDFTLR08
-Total de semanas cotizadas
-1422
-
-Nombre del patrón
-CONTINUACION VOLUNTARIA EN EL REGIMEN OBLIGATORIO
-Registro Patronal
-Y669999940
-Fecha de alta 02/09/2023 Fecha de baja 31/08/2025 Salario Base de Cotización * $ 2593.5
-Tipo de movimiento
-Fecha de movimiento
-Salario Base
-BAJA 31/10/2025 $ 1700.00
-REINGRESO 02/10/2022 $ 1700.00
-
-Nombre del patrón
-RESTAURANTES IZY DE MEXICO
-Registro Patronal
-C602404910
-Fecha de alta 01/07/2017 Fecha de baja 01/09/2017 Salario Base de Cotización * $ 230.76
-Tipo de movimiento
-Fecha de movimiento
-Salario Base
-BAJA 01/09/2017 $ 230.76
-REINGRESO 01/07/2017 $ 230.76
-`;
-            setRawData(exampleSindo.trim());
-            setRawSisec(exampleSisec.trim());
-            setIsSisecEnabled(true); 
-            setTimeout(() => document.getElementById('btn-procesar')?.click(), 100);
+        const transferToCalculator = () => {
+            const dataToTransfer = {
+                semanas: sisecData?.totalSemanas || '0',
+                salario: sisecData?.employers[0]?.movimientos[0]?.salario || '0',
+                nombre: parsedData?.personal?.nombre || sisecData?.personal?.nombre || 'Cliente'
+            };
+            setCalcDataBridge(dataToTransfer);
+            setCurrentModule('pension');
+            showToast('Datos transferidos al cotizador', 'success');
         };
 
         const parseSISEC = (text) => {
@@ -672,7 +1602,7 @@ REINGRESO 01/07/2017 $ 230.76
                 const nameSection = block.split(/Registro\s+Patronal/i)[0];
                 const name = nameSection.replace(/\\n/g, ' ').trim() || 'DESCONOCIDO';
 
-                const movRegex = /(BAJA|REINGRESO|MODIFICACION\s*DE\s*SALARIO|ALTA)\s*([\d]{2}\/[\d]{2}\/[\d]{4})\s*\$\s*([\d.]+)/gi;
+                const movRegex = /(BAJA|REINGRESO|MODIFICACION\s*DE\s*SALARIO|ALTA)\s*([\d]{2}\/[\d]{2}\/[\d]{4})\s*\$\s*([\d.,]+)/gi;
                 let m;
                 while ((m = movRegex.exec(block)) !== null) {
                     allSisecMovs.push({
@@ -680,7 +1610,7 @@ REINGRESO 01/07/2017 $ 230.76
                         nombre: name,
                         tipo: m[1].replace(/\s+/g, ' ').trim().toUpperCase(),
                         fecha: m[2].trim(),
-                        salario: m[3].trim()
+                        salario: m[3].replace(/,/g, '').trim()
                     });
                 }
             });
@@ -725,7 +1655,10 @@ REINGRESO 01/07/2017 $ 230.76
         };
 
         const processData = () => {
-            if (!rawData.trim() && !rawSisec.trim()) return;
+            if (!rawData.trim() && !rawSisec.trim()) {
+                showToast('Pegue los datos para procesar', 'error');
+                return;
+            }
 
             let finalSindoData = null;
             let finalSisecData = null;
@@ -1056,6 +1989,7 @@ REINGRESO 01/07/2017 $ 230.76
             }
 
             setParsedData(finalSindoData); setSisecData(finalSisecData); setCruceData(finalCruce);
+            showToast('Datos analizados exitosamente');
             if (finalSindoData && !finalSisecData) setActiveTab('sindo');
             if (finalCruce) setActiveTab('cruce');
         };
@@ -1063,7 +1997,7 @@ REINGRESO 01/07/2017 $ 230.76
         const handleAuthSubmit = (e) => {
             e.preventDefault();
             const now = new Date();
-            const oneMinAgo = new Date(now.getTime() - 60000); // 1 minuto de tolerancia
+            const oneMinAgo = new Date(now.getTime() - 60000); 
 
             const getExpectedPins = (d) => {
                 let h12 = d.getHours() % 12;
@@ -1071,7 +2005,7 @@ REINGRESO 01/07/2017 $ 230.76
                 const strH12 = h12.toString().padStart(2, '0');
                 const strH24 = d.getHours().toString().padStart(2, '0');
                 const strM = d.getMinutes().toString().padStart(2, '0');
-                return [strH12 + strM, strH24 + strM]; // Genera PIN en 12h y 24h
+                return [strH12 + strM, strH24 + strM]; 
             };
 
             const validPins = [...getExpectedPins(now), ...getExpectedPins(oneMinAgo)];
@@ -1090,7 +2024,6 @@ REINGRESO 01/07/2017 $ 230.76
             return (
             <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center font-sans p-6 relative">
                 
-                {/* --- MODAL DE SEGURIDAD PIN --- */}
                 {showSindoAuth && (
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative">
@@ -1123,13 +2056,14 @@ REINGRESO 01/07/2017 $ 230.76
                     </div>
                 )}
 
-                <div className="max-w-5xl w-full">
+                <div className="max-w-6xl w-full">
                 <div className="text-center mb-16">
                     <h1 className="text-4xl md:text-5xl font-black text-[#003366] tracking-tighter uppercase mb-4">RGC Pensiones y Seguros</h1>
                     <p className="text-[#D4AF37] font-black tracking-widest uppercase text-lg">Portal de Herramientas Internas</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
                     <button 
                     onClick={() => setShowSindoAuth(true)} 
                     className="group bg-white rounded-3xl p-8 shadow-xl border-b-[8px] border-[#003366] hover:-translate-y-2 hover:shadow-2xl transition-all text-left flex flex-col h-full"
@@ -1157,6 +2091,21 @@ REINGRESO 01/07/2017 $ 230.76
                         Abrir Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
                     </div>
                     </button>
+
+                    <button 
+                    onClick={() => setCurrentModule('documentos')} 
+                    className="group bg-white rounded-3xl p-8 shadow-xl border-b-[8px] border-emerald-600 hover:-translate-y-2 hover:shadow-2xl transition-all text-left flex flex-col h-full"
+                    >
+                    <div className="bg-emerald-50 p-5 rounded-2xl w-fit mb-6 group-hover:bg-emerald-600 transition-colors">
+                        <FolderOpen className="w-10 h-10 text-emerald-600 group-hover:text-white transition-colors" />
+                    </div>
+                    <h2 className="text-2xl font-black text-[#003366] mb-3 uppercase tracking-wide">Documentos y Protocolos</h2>
+                    <p className="text-slate-500 font-medium flex-1 text-sm leading-relaxed">Protocolo de carga de expedientes, políticas de nomenclatura, generador de carpetas, listado de requisitos para clientes y formatos.</p>
+                    <div className="mt-8 flex items-center gap-2 text-emerald-600 font-black uppercase tracking-widest text-sm">
+                        Abrir Módulo <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                    </div>
+                    </button>
+
                 </div>
                 </div>
             </div>
@@ -1165,7 +2114,16 @@ REINGRESO 01/07/2017 $ 230.76
 
         if (currentModule === 'pension') {
             return (
-            <div className="min-h-screen bg-slate-100 p-4 font-sans text-slate-900">
+            <div className="min-h-screen bg-slate-100 p-4 font-sans text-slate-900 relative">
+                <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+                    {toasts.map(t => (
+                        <div key={t.id} className={`px-5 py-3 rounded-xl shadow-xl font-bold text-sm flex items-center gap-2 animate-toast ${t.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                            {t.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
+                            {t.message}
+                        </div>
+                    ))}
+                </div>
+
                 <div className="max-w-[1400px] mx-auto">
                 <header className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 mb-6">
                     <div className="flex items-center gap-4">
@@ -1187,16 +2145,63 @@ REINGRESO 01/07/2017 $ 230.76
                 </header>
                 
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-2">
-                    <ModuloPension />
+                    <ModuloPension dataBridge={calcDataBridge} />
                 </div>
                 </div>
             </div>
             );
         }
 
+        if (currentModule === 'documentos') {
+            return (
+            <div className="min-h-screen bg-slate-100 p-4 font-sans text-slate-900 print:bg-white print:p-0 relative">
+                <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 print:hidden">
+                    {toasts.map(t => (
+                        <div key={t.id} className={`px-5 py-3 rounded-xl shadow-xl font-bold text-sm flex items-center gap-2 animate-toast ${t.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                            {t.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
+                            {t.message}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="max-w-[1400px] mx-auto">
+                <header className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 mb-6 print:hidden">
+                    <div className="flex items-center gap-4">
+                        <button 
+                        onClick={() => setCurrentModule('menu')} 
+                        className="p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-[#003366] hover:text-white transition-colors text-[#003366]"
+                        title="Volver al Menú Principal"
+                        >
+                        <ChevronLeft className="w-6 h-6" />
+                        </button>
+                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl shadow-sm">
+                        <FolderOpen className="w-8 h-8 text-emerald-600" />
+                        </div>
+                        <div>
+                        <h1 className="text-2xl font-black text-[#003366] tracking-tight">GESTIÓN DOCUMENTAL</h1>
+                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">Reglas, Formatos y Expedientes</p>
+                        </div>
+                    </div>
+                </header>
+                
+                <ModuloDocumentos showToast={showToast} />
+                </div>
+            </div>
+            );
+        }
+
         return (
-            <div className="min-h-screen bg-slate-50 p-4 font-sans text-slate-900 print:p-0 print:bg-white">
+            <div className="min-h-screen bg-slate-50 p-4 font-sans text-slate-900 print:p-0 print:bg-white relative">
             
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 print:hidden">
+                {toasts.map(t => (
+                    <div key={t.id} className={`px-5 py-3 rounded-xl shadow-xl font-bold text-sm flex items-center gap-2 animate-toast ${t.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                        {t.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
+                        {t.message}
+                    </div>
+                ))}
+            </div>
+
             <div id="informe-auditoria" className={`max-w-6xl mx-auto space-y-6 print:space-y-4 ${isGeneratingPDF ? 'pdf-mode' : ''}`}>
 
                 <div className="hidden print:block print:min-h-screen">
@@ -1270,13 +2275,7 @@ REINGRESO 01/07/2017 $ 230.76
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <button 
-                    onClick={loadExampleData} 
-                    className="px-4 py-2.5 text-[11px] font-black text-[#003366] bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors uppercase tracking-widest flex items-center gap-2"
-                    >
-                    <FileText className="w-4 h-4" /> Cargar Ejemplo
-                    </button>
-                    <button 
-                    onClick={() => { setRawData(''); setRawSisec(''); setParsedData(null); setSisecData(null); setCruceData(null); setIsSisecEnabled(false); }} 
+                    onClick={() => { setRawData(''); setRawSisec(''); setParsedData(null); setSisecData(null); setCruceData(null); setIsSisecEnabled(false); showToast('Datos limpiados'); }} 
                     className="px-4 py-2.5 text-[11px] font-black text-slate-400 hover:text-rose-500 transition-colors uppercase tracking-widest"
                     >
                     Limpiar
@@ -1319,18 +2318,42 @@ REINGRESO 01/07/2017 $ 230.76
                                 <div className="p-5 bg-[#D4AF37] text-[#003366] flex items-center justify-between border-b-4 border-[#003366]">
                                     <div className="flex items-center gap-3">
                                         <FileText className="w-5 h-5 text-[#003366]" />
-                                        <span className="text-sm font-black uppercase tracking-widest">2. Pegar Constancia SISEC</span>
+                                        <span className="text-sm font-black uppercase tracking-widest">2. Cargar Constancia SISEC</span>
                                     </div>
-                                    <button onClick={() => { setIsSisecEnabled(false); setRawSisec(''); }} className="text-[#003366] hover:text-white transition-colors" title="Ocultar SISEC">
-                                        <XCircle className="w-6 h-6" />
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        <label className="cursor-pointer bg-white text-[#003366] hover:bg-slate-50 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-colors border border-[#003366]/20">
+                                            <UploadCloud className="w-3.5 h-3.5" />
+                                            Subir PDF
+                                            <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
+                                        </label>
+                                        <button onClick={() => { setIsSisecEnabled(false); setRawSisec(''); }} className="text-[#003366] hover:text-white transition-colors" title="Ocultar SISEC">
+                                            <XCircle className="w-6 h-6" />
+                                        </button>
+                                    </div>
                                 </div>
-                                <textarea
-                                    className="flex-1 w-full p-6 font-mono text-xs focus:ring-0 focus:outline-none resize-none bg-[#fffdf0] text-slate-600 leading-relaxed"
-                                    placeholder="Pegue aquí el texto copiado del PDF Constancia de Semanas Cotizadas..."
-                                    value={rawSisec}
-                                    onChange={(e) => setRawSisec(e.target.value)}
-                                />
+                                <div className="relative flex-1 flex flex-col bg-[#fffdf0]">
+                                    {!rawSisec ? (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#003366]/20 m-4 rounded-2xl bg-white/50 hover:bg-white transition-colors">
+                                            <UploadCloud className="w-12 h-12 text-[#D4AF37] mb-4" />
+                                            <p className="text-sm font-black text-[#003366] uppercase tracking-widest text-center mb-2">Sube el PDF de SISEC</p>
+                                            <p className="text-xs text-slate-500 text-center mb-6">Extraeremos las semanas y movimientos automáticamente.</p>
+                                            <label className="cursor-pointer bg-[#003366] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:-translate-y-1 transition-all flex items-center gap-2">
+                                                Explorar PDF
+                                                <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
+                                            </label>
+                                            <button onClick={() => setRawSisec(' ')} className="mt-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest hover:text-[#003366] transition-colors">
+                                                O pegar texto manualmente
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <textarea
+                                            className="w-full h-full p-6 font-mono text-xs focus:ring-0 focus:outline-none resize-none bg-transparent text-slate-600 leading-relaxed"
+                                            placeholder="Texto extraído o pegado de la constancia SISEC..."
+                                            value={rawSisec}
+                                            onChange={(e) => setRawSisec(e.target.value)}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1354,6 +2377,15 @@ REINGRESO 01/07/2017 $ 230.76
                         </div>
 
                         <div className="flex gap-3 items-center">
+                            {parsedData && (
+                                <button 
+                                onClick={transferToCalculator}
+                                className="px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest bg-violet-50 text-violet-700 hover:bg-violet-600 hover:text-white border border-violet-200 transition-all flex items-center gap-2 shadow-sm mr-2"
+                                >
+                                    <Send className="w-3.5 h-3.5" /> Proyectar Pensión
+                                </button>
+                            )}
+
                             <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
                                 <button 
                                     onClick={() => setViewMode('cliente')} 
