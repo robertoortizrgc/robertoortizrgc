@@ -110,6 +110,7 @@
         const UploadCloud = (p) => <Icon name="upload-cloud" {...p} />;
         const Send = (p) => <Icon name="send" {...p} />;
         const Cloud = (p) => <Icon name="cloud" {...p} />;
+        const Banknote = (p) => <Icon name="banknote" {...p} />;
 
         // --- ESTILOS GLOBALES ---
         const customStyles = `
@@ -537,6 +538,54 @@
                 { title: 'Vale Inicial para Pensión Directa', desc: 'Cuestionario para trámites de pensión directa sin M40.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' }
             ];
 
+            const preciosTP = [
+                { id: 2, name: 'T.P. DIR-LOCAL S/Ñ', desc: 'CDMX/EDO MEX (TP+MOT+HON+GF)', price: '$65,000.00' },
+                { id: 3, name: 'T.P. DIR-LOCAL C/Ñ', desc: 'CDMX/EDO MEX (TP+MOT+HON+GF)', price: '$70,000.00' },
+                { id: 4, name: 'T.P. DIR FORANEOS S/Ñ', desc: 'TOLUCA(TP+MOT+HON+GF)', price: '$75,000.00' },
+                { id: 5, name: 'T.P. DIR FORANEOS C/Ñ', desc: 'TOLUCA(TP+MOT+HON+GF)', price: '$80,000.00' },
+                { id: 6, name: 'T.P. M40 LOCAL S/Ñ', desc: 'CDMX/EDO MEX (AM40+BM40+MOT+TP+HON+GF)', price: '$75,000.00' },
+                { id: 7, name: 'T.P. M40 LOCAL C/Ñ', desc: 'CDMX/EDO MEX (AM40+BM40+MOT+TP+HON+GF)', price: '$80,000.00' },
+                { id: 8, name: 'T.P. M40 FORANEOS S/Ñ', desc: 'TOLUCA(AM40-BM40+MOT+TP+HON+GF)', price: '$80,000.00' },
+                { id: 9, name: 'T.P. M40 FORANEOS C/Ñ', desc: 'TOLUCA(AM40-BM40+MOT+TP+HON+GF)', price: '$85,000.00' },
+            ];
+
+            const preciosGestiones = [
+                { id: 10, name: 'Portabilidad ISSSTE A IMSS', price: '$7,000.00', highlight: true },
+                { id: 11, name: 'S. VIDA', price: '$20,000.00', highlight: true },
+                { id: 12, name: 'SISEC', price: '$350.00' },
+                { id: 13, name: 'SISEC VINCULADO CORREO', price: '$350.00' },
+                { id: 14, name: 'H. PAT', price: '$2,500.00' },
+                { id: 15, name: 'RFC', price: '$350.00' },
+                { id: 16, name: 'CITA RFC', price: '$500.00' },
+                { id: 17, name: 'A-M40', price: '$7,000.00' },
+                { id: 18, name: 'B-M40', price: '$4,000.00' },
+                { id: 19, name: 'B.S.', price: '$10,000.00' },
+                { id: 20, name: 'UNIF+CERT SEM', price: '$8,000.00' },
+                { id: 21, name: 'HOMONIMIA', price: '$8,000.00' },
+                { id: 22, name: 'INV Ó SEPARACION', price: '$14,500.00' },
+                { id: 23, name: 'C.DATOS IMSS', price: '$4,000.00' },
+                { id: 24, name: 'MOTIVOS', price: '$7,500.00' },
+                { id: 25, name: 'H.INFONAVIT', price: '$1,000.00' },
+                { id: 26, name: 'A.NAC-A.DEF-A.MAT', price: '$350.00' },
+                { id: 27, name: 'DIG. A.NAC R.CIVIL(RENAPO)CDMX', price: '$7,000.00' },
+                { id: 28, name: 'DIG. A.NAC R.CIVIL(RENAPO)FORANEA', price: '$7,500.00' },
+                { id: 29, name: 'L.CAP A-M40 Y TALONARIO', price: '$350.00' },
+                { id: 30, name: 'L.CAP A-M40 EXTEMPORANEAS', price: '$350.00' },
+                { id: 31, name: 'L.CAP M-40 TYF', price: '$350.00' },
+                { id: 32, name: 'CERT. CURP RENAPO-CORR LOCAL', price: '$7,000.00' },
+                { id: 33, name: 'CERT. CURP RENAPO-CORR FORANEA', price: '$7,500.00' },
+                { id: 34, name: 'Q.P.', price: '$60,000.00', highlight: true },
+                { id: 35, name: 'R.O.', price: '$300,000.00', highlight: true },
+            ];
+
+            const preciosTH = [
+                { id: 1, name: 'T.H. x cliente mensual', price: '$4,250.00', color: 'bg-yellow-400' },
+                { id: 2, name: 'T.H. mensual 50% financiado', price: '$2,500.00', color: 'bg-pink-400' },
+                { id: 3, name: 'T.H. 50% +TP+Motivo (16m)', price: '$118,000.00', color: 'bg-rose-500' },
+                { id: 4, name: 'T.H. 100% financiado mensual', price: 'NA', color: 'bg-rose-500' },
+                { id: 5, name: 'T.H. 100% financiado con TP', price: 'NA', color: 'bg-emerald-500' },
+            ];
+
             return (
                 <div className="w-full">
                     {/* Navegación Interna Documentos */}
@@ -555,6 +604,9 @@
                         </button>
                         <button onClick={() => setDocTab('herramientas')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'herramientas' ? 'bg-[#D4AF37] text-[#003366] shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
                             <FolderOpen className="w-4 h-4" /> Herramientas y Vales
+                        </button>
+                        <button onClick={() => setDocTab('precios')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'precios' ? 'bg-[#D4AF37] text-[#003366] shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+                            <Banknote className="w-4 h-4" /> Lista de Precios
                         </button>
                     </div>
 
@@ -1182,6 +1234,118 @@
 
                         </div>
                     )}
+
+                    {/* CONTENIDO: LISTA DE PRECIOS */}
+                    {docTab === 'precios' && (
+                        <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200">
+                            <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6 print:hidden">
+                                <div>
+                                    <h2 className="text-3xl lg:text-4xl font-black text-[#003366] uppercase tracking-tight">Catálogo de Servicios</h2>
+                                    <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm mt-2 flex items-center gap-2">
+                                        <Banknote className="w-5 h-5" /> Tarifas Oficiales Vigentes - Año 2026
+                                    </p>
+                                </div>
+                                <button onClick={() => window.print()} className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-md hover:bg-[#002244] shrink-0">
+                                    <Printer className="w-4 h-4" /> Imprimir Tabulador
+                                </button>
+                            </div>
+
+                            <div className="space-y-8 max-w-4xl mx-auto print:max-w-full">
+                                
+                                {/* Info Base */}
+                                <div className="flex flex-wrap justify-between items-center bg-slate-100 p-4 rounded-xl border border-slate-200 font-black uppercase tracking-widest text-slate-500 text-xs md:text-sm">
+                                    <span className="flex items-center gap-2"><CalendarX className="w-4 h-4"/> Fecha de elaboración: 3/3/26</span>
+                                    <span className="text-[#003366] bg-white border border-slate-200 px-4 py-1.5 rounded-lg shadow-sm">Año: 2026</span>
+                                </div>
+
+                                {/* ESTUDIO PRINCIPAL */}
+                                <div className="bg-gradient-to-r from-[#D4AF37] to-[#e5c965] p-6 rounded-2xl flex flex-wrap justify-between items-center shadow-lg text-[#003366] border border-[#B8962E]">
+                                    <div className="flex items-center gap-4 mb-2 md:mb-0">
+                                        <div className="w-12 h-12 bg-white/40 rounded-xl flex items-center justify-center font-black text-2xl shadow-sm">1</div>
+                                        <div>
+                                            <h3 className="text-2xl font-black tracking-widest uppercase">ESTUDIO</h3>
+                                            <p className="text-xs font-bold uppercase tracking-widest text-[#003366]/70">Análisis inicial</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-3xl md:text-4xl font-black font-mono bg-white/60 px-6 py-2 rounded-xl shadow-inner">$2,500.00</div>
+                                </div>
+
+                                {/* TABLA TP */}
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-[#003366] text-white uppercase tracking-widest text-[10px] md:text-xs">
+                                            <tr>
+                                                <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
+                                                <th className="p-3 md:p-4">Trámite de Pensión (T.P. / M40)</th>
+                                                <th className="p-3 md:p-4 text-right">Costo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
+                                            {preciosTP.map((item) => (
+                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
+                                                    <td className="p-3 md:p-4 font-black text-slate-700 leading-tight">
+                                                        {item.name} 
+                                                        <span className="block text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.desc}</span>
+                                                    </td>
+                                                    <td className="p-3 md:p-4 text-right font-mono font-black text-[#003366] text-base md:text-lg bg-blue-50/30">{item.price}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* TABLA GESTIONES */}
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] md:text-xs border-b border-slate-200">
+                                            <tr>
+                                                <th className="p-3 md:p-4 w-12 text-center border-r border-slate-200">No.</th>
+                                                <th className="p-3 md:p-4">Gestiones y Certificaciones</th>
+                                                <th className="p-3 md:p-4 text-right">Costo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white text-xs md:text-sm">
+                                            {preciosGestiones.map((item) => (
+                                                <tr key={item.id} className={`transition-colors ${item.highlight ? 'bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border-l-4 border-l-[#D4AF37]' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}>
+                                                    <td className={`p-2.5 md:p-3 text-center font-bold border-r border-slate-100 ${item.highlight ? 'text-[#003366]' : 'text-slate-400'}`}>{item.id}</td>
+                                                    <td className={`p-2.5 md:p-3 font-bold ${item.highlight ? 'text-[#003366]' : 'text-slate-600'}`}>{item.name}</td>
+                                                    <td className={`p-2.5 md:p-3 text-right font-mono font-black ${item.highlight ? 'text-[#003366] text-base' : 'text-slate-600'}`}>{item.price}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* TABLA T.H. */}
+                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-800 text-slate-300 uppercase tracking-widest text-[10px] md:text-xs">
+                                            <tr>
+                                                <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
+                                                <th className="p-3 md:p-4">Esquemas T.H. (Mensualidades / Financiado)</th>
+                                                <th className="p-3 md:p-4 text-right">Costo</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
+                                            {preciosTH.map((item) => (
+                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
+                                                    <td className="p-3 md:p-4 font-black text-slate-700 flex items-center gap-3">
+                                                        <div className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${item.color}`}></div>
+                                                        {item.name}
+                                                    </td>
+                                                    <td className="p-3 md:p-4 text-right font-mono font-black text-slate-600 text-base">{item.price}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             );
         };
@@ -2036,7 +2200,7 @@
                                 </div>
                             </div>
                             <h3 className="text-xl font-black text-center text-[#003366] mb-2 uppercase tracking-wide">Acceso Protegido</h3>
-                            <p className="text-sm text-center text-slate-500 mb-6">Ingrese el PIN de seguridad (Hora Actual en formato HHMM) para acceder.</p>
+                            <p className="text-sm text-center text-slate-500 mb-6">Ingrese el PIN de seguridad </p>
                             <form onSubmit={handleAuthSubmit}>
                                 <input
                                     type="password"
