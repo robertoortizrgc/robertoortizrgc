@@ -1,3 +1,4 @@
+ama
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -318,6 +319,9 @@
             const [clientName, setClientName] = useState('');
             const [docVars, setDocVars] = useState({});
             const [draggedDoc, setDraggedDoc] = useState(null);
+            
+            // Estado para Buscador de Precios
+            const [priceSearchTerm, setPriceSearchTerm] = useState('');
 
             const docsConfig = [
                 { id: 'acta', prefijo: 'ACTA DE NACIMIENTO', vars: ['FECHA EXP', 'OBS'] },
@@ -585,6 +589,11 @@
                 { id: 4, name: 'T.H. 100% financiado mensual', price: 'NA', color: 'bg-rose-500' },
                 { id: 5, name: 'T.H. 100% financiado con TP', price: 'NA', color: 'bg-emerald-500' },
             ];
+
+            // Filtros para buscador de precios
+            const filteredTP = preciosTP.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()) || item.desc.toLowerCase().includes(priceSearchTerm.toLowerCase()));
+            const filteredGestiones = preciosGestiones.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()));
+            const filteredTH = preciosTH.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()));
 
             return (
                 <div className="w-full">
@@ -1245,9 +1254,21 @@
                                         <Banknote className="w-5 h-5" /> Tarifas Oficiales Vigentes - Año 2026
                                     </p>
                                 </div>
-                                <button onClick={() => window.print()} className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-md hover:bg-[#002244] shrink-0">
-                                    <Printer className="w-4 h-4" /> Imprimir Tabulador
-                                </button>
+                                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Buscar trámite o precio..." 
+                                            className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-[#D4AF37] bg-slate-50"
+                                            value={priceSearchTerm}
+                                            onChange={(e) => setPriceSearchTerm(e.target.value)}
+                                        />
+                                        <Search className="w-4 h-4 absolute right-4 top-3.5 text-slate-400" />
+                                    </div>
+                                    <button onClick={() => window.print()} className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-md hover:bg-[#002244] shrink-0">
+                                        <Printer className="w-4 h-4" /> Imprimir 
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="space-y-8 max-w-4xl mx-auto print:max-w-full">
@@ -1259,7 +1280,7 @@
                                 </div>
 
                                 {/* ESTUDIO PRINCIPAL */}
-                                <div className="bg-gradient-to-r from-[#D4AF37] to-[#e5c965] p-6 rounded-2xl flex flex-wrap justify-between items-center shadow-lg text-[#003366] border border-[#B8962E]">
+                                <div className="bg-gradient-to-r from-[#D4AF37] to-[#e5c965] p-6 rounded-2xl flex flex-wrap justify-between items-center shadow-lg text-[#003366] border border-[#B8962E] relative group">
                                     <div className="flex items-center gap-4 mb-2 md:mb-0">
                                         <div className="w-12 h-12 bg-white/40 rounded-xl flex items-center justify-center font-black text-2xl shadow-sm">1</div>
                                         <div>
@@ -1267,80 +1288,133 @@
                                             <p className="text-xs font-bold uppercase tracking-widest text-[#003366]/70">Análisis inicial</p>
                                         </div>
                                     </div>
-                                    <div className="text-3xl md:text-4xl font-black font-mono bg-white/60 px-6 py-2 rounded-xl shadow-inner">$2,500.00</div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="text-3xl md:text-4xl font-black font-mono bg-white/60 px-6 py-2 rounded-xl shadow-inner">$2,500.00</div>
+                                        <button 
+                                            onClick={() => { copyToClipboard('ESTUDIO (Análisis Inicial): $2,500.00'); if(showToast) showToast('Precio copiado'); }}
+                                            className="p-3 bg-white border border-white/40 rounded-xl hover:bg-[#003366] hover:text-white transition-all shadow-sm opacity-0 group-hover:opacity-100 print:hidden"
+                                            title="Copiar Precio"
+                                        >
+                                            <Copy className="w-5 h-5" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* TABLA TP */}
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-[#003366] text-white uppercase tracking-widest text-[10px] md:text-xs">
-                                            <tr>
-                                                <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
-                                                <th className="p-3 md:p-4">Trámite de Pensión (T.P. / M40)</th>
-                                                <th className="p-3 md:p-4 text-right">Costo</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
-                                            {preciosTP.map((item) => (
-                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
-                                                    <td className="p-3 md:p-4 font-black text-slate-700 leading-tight">
-                                                        {item.name} 
-                                                        <span className="block text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.desc}</span>
-                                                    </td>
-                                                    <td className="p-3 md:p-4 text-right font-mono font-black text-[#003366] text-base md:text-lg bg-blue-50/30">{item.price}</td>
+                                {filteredTP.length > 0 && (
+                                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-[#003366] text-white uppercase tracking-widest text-[10px] md:text-xs">
+                                                <tr>
+                                                    <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
+                                                    <th className="p-3 md:p-4">Trámite de Pensión (T.P. / M40)</th>
+                                                    <th className="p-3 md:p-4 text-right">Costo</th>
+                                                    <th className="p-3 w-16 text-center print:hidden"></th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
+                                                {filteredTP.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
+                                                        <td className="p-3 md:p-4 font-black text-slate-700 leading-tight">
+                                                            {item.name} 
+                                                            <span className="block text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{item.desc}</span>
+                                                        </td>
+                                                        <td className="p-3 md:p-4 text-right font-mono font-black text-[#003366] text-base md:text-lg bg-blue-50/30">{item.price}</td>
+                                                        <td className="p-3 text-center print:hidden">
+                                                            <button 
+                                                                onClick={() => { copyToClipboard(`${item.name} (${item.desc}): ${item.price}`); if(showToast) showToast('Precio copiado'); }}
+                                                                className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-[#D4AF37] hover:text-[#003366] transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Copiar Precio"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
 
                                 {/* TABLA GESTIONES */}
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] md:text-xs border-b border-slate-200">
-                                            <tr>
-                                                <th className="p-3 md:p-4 w-12 text-center border-r border-slate-200">No.</th>
-                                                <th className="p-3 md:p-4">Gestiones y Certificaciones</th>
-                                                <th className="p-3 md:p-4 text-right">Costo</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100 bg-white text-xs md:text-sm">
-                                            {preciosGestiones.map((item) => (
-                                                <tr key={item.id} className={`transition-colors ${item.highlight ? 'bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border-l-4 border-l-[#D4AF37]' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}>
-                                                    <td className={`p-2.5 md:p-3 text-center font-bold border-r border-slate-100 ${item.highlight ? 'text-[#003366]' : 'text-slate-400'}`}>{item.id}</td>
-                                                    <td className={`p-2.5 md:p-3 font-bold ${item.highlight ? 'text-[#003366]' : 'text-slate-600'}`}>{item.name}</td>
-                                                    <td className={`p-2.5 md:p-3 text-right font-mono font-black ${item.highlight ? 'text-[#003366] text-base' : 'text-slate-600'}`}>{item.price}</td>
+                                {filteredGestiones.length > 0 && (
+                                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-slate-100 text-slate-500 uppercase tracking-widest text-[10px] md:text-xs border-b border-slate-200">
+                                                <tr>
+                                                    <th className="p-3 md:p-4 w-12 text-center border-r border-slate-200">No.</th>
+                                                    <th className="p-3 md:p-4">Gestiones y Certificaciones</th>
+                                                    <th className="p-3 md:p-4 text-right">Costo</th>
+                                                    <th className="p-3 w-16 text-center print:hidden"></th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 bg-white text-xs md:text-sm">
+                                                {filteredGestiones.map((item) => (
+                                                    <tr key={item.id} className={`transition-colors group ${item.highlight ? 'bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 border-l-4 border-l-[#D4AF37]' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}>
+                                                        <td className={`p-2.5 md:p-3 text-center font-bold border-r border-slate-100 ${item.highlight ? 'text-[#003366]' : 'text-slate-400'}`}>{item.id}</td>
+                                                        <td className={`p-2.5 md:p-3 font-bold ${item.highlight ? 'text-[#003366]' : 'text-slate-600'}`}>{item.name}</td>
+                                                        <td className={`p-2.5 md:p-3 text-right font-mono font-black ${item.highlight ? 'text-[#003366] text-base' : 'text-slate-600'}`}>{item.price}</td>
+                                                        <td className="p-2.5 text-center print:hidden">
+                                                            <button 
+                                                                onClick={() => { copyToClipboard(`${item.name}: ${item.price}`); if(showToast) showToast('Precio copiado'); }}
+                                                                className={`p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 ${item.highlight ? 'bg-white text-[#003366] hover:bg-[#003366] hover:text-white' : 'bg-slate-100 text-slate-400 hover:bg-[#D4AF37] hover:text-white'}`}
+                                                                title="Copiar Precio"
+                                                            >
+                                                                <Copy className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
 
                                 {/* TABLA T.H. */}
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-slate-800 text-slate-300 uppercase tracking-widest text-[10px] md:text-xs">
-                                            <tr>
-                                                <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
-                                                <th className="p-3 md:p-4">Esquemas T.H. (Mensualidades / Financiado)</th>
-                                                <th className="p-3 md:p-4 text-right">Costo</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
-                                            {preciosTH.map((item) => (
-                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
-                                                    <td className="p-3 md:p-4 font-black text-slate-700 flex items-center gap-3">
-                                                        <div className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${item.color}`}></div>
-                                                        {item.name}
-                                                    </td>
-                                                    <td className="p-3 md:p-4 text-right font-mono font-black text-slate-600 text-base">{item.price}</td>
+                                {filteredTH.length > 0 && (
+                                    <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-slate-800 text-slate-300 uppercase tracking-widest text-[10px] md:text-xs">
+                                                <tr>
+                                                    <th className="p-3 md:p-4 w-12 text-center border-r border-white/10">No.</th>
+                                                    <th className="p-3 md:p-4">Esquemas T.H. (Mensualidades / Financiado)</th>
+                                                    <th className="p-3 md:p-4 text-right">Costo</th>
+                                                    <th className="p-3 w-16 text-center print:hidden"></th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white text-xs md:text-sm">
+                                                {filteredTH.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="p-3 md:p-4 text-center font-bold text-slate-400 bg-slate-50 border-r border-slate-100">{item.id}</td>
+                                                        <td className="p-3 md:p-4 font-black text-slate-700 flex items-center gap-3">
+                                                            <div className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${item.color}`}></div>
+                                                            {item.name}
+                                                        </td>
+                                                        <td className="p-3 md:p-4 text-right font-mono font-black text-slate-600 text-base">{item.price}</td>
+                                                        <td className="p-3 text-center print:hidden">
+                                                            <button 
+                                                                onClick={() => { copyToClipboard(`${item.name}: ${item.price}`); if(showToast) showToast('Precio copiado'); }}
+                                                                className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-slate-800 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Copiar Precio"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {/* Empty State Búsqueda */}
+                                {filteredTP.length === 0 && filteredGestiones.length === 0 && filteredTH.length === 0 && (
+                                    <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center text-slate-400">
+                                        <Search className="w-10 h-10 mb-3 opacity-50" />
+                                        <p className="font-bold uppercase tracking-widest text-sm">No se encontraron resultados para "{priceSearchTerm}"</p>
+                                    </div>
+                                )}
 
                             </div>
                         </div>
@@ -2200,7 +2274,7 @@
                                 </div>
                             </div>
                             <h3 className="text-xl font-black text-center text-[#003366] mb-2 uppercase tracking-wide">Acceso Protegido</h3>
-                            <p className="text-sm text-center text-slate-500 mb-6">Ingrese el PIN de seguridad </p>
+                            <p className="text-sm text-center text-slate-500 mb-6">Ingrese el PIN de seguridad para acceder.</p>
                             <form onSubmit={handleAuthSubmit}>
                                 <input
                                     type="password"
@@ -2541,15 +2615,6 @@
                         </div>
 
                         <div className="flex gap-3 items-center">
-                            {parsedData && (
-                                <button 
-                                onClick={transferToCalculator}
-                                className="px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest bg-violet-50 text-violet-700 hover:bg-violet-600 hover:text-white border border-violet-200 transition-all flex items-center gap-2 shadow-sm mr-2"
-                                >
-                                    <Send className="w-3.5 h-3.5" /> Proyectar Pensión
-                                </button>
-                            )}
-
                             <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
                                 <button 
                                     onClick={() => setViewMode('cliente')} 
