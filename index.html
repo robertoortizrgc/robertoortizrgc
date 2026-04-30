@@ -1,4 +1,3 @@
-ama
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -2024,6 +2023,16 @@ ama
                 const empNameWithPeriod = group.info.totalPeriods > 1 ? `${group.info.nombre} (Periodo ${group.info.periodIndex})` : group.info.nombre;
 
                 group.movements.forEach(mov => {
+                
+                // --- DETECCIÓN DE MOVIMIENTOS POST-CLAUSURA (Mismo día o posterior) ---
+                if (group.info.isBaja && group.info.bajaDate) {
+                    const dMov = parseDateStr(mov.fMov);
+                    const dBaja = mov.fBaja ? parseDateStr(mov.fBaja) : null;
+                    if ((dMov && dMov.getTime() >= group.info.bajaDate.getTime()) || (dBaja && dBaja.getTime() >= group.info.bajaDate.getTime())) {
+                        mov.isPostBaja = true;
+                    }
+                }
+
                 const lateInfo = getLateSubmissionInfo(mov.fRecep, mov.fMov);
                 mov.lateInfo = lateInfo;
 
@@ -2072,6 +2081,12 @@ ama
                     stats.totalRisks++;
                     stats.riskEvents.push({ empresa: empNameWithPeriod, fecha: mov.fBaja || mov.fMov, origen: mov.origenFin, tipo: mov.tipoFin, etapa: 'CIERRE', desc: TIPO_MAP[mov.tipoFin] || 'Desconocido' });
                 }
+                
+                // Sumar al total de conflictos post-baja para las estadísticas
+                if (mov.isPostBaja) {
+                    stats.bajaConflicts++;
+                }
+
                 });
             });
 
@@ -2084,8 +2099,13 @@ ama
                     let maxBaja = null;
                     
                     movs.forEach(mov => {
-                        if (emp.bajaDate && parseDateStr(mov.fMov) > emp.bajaDate) hasPostBajaMovements = true;
-                        if (mov.fBaja && emp.bajaDate && parseDateStr(mov.fBaja) > emp.bajaDate) hasPostBajaMovements = true;
+                        const dMov = parseDateStr(mov.fMov);
+                        const dBaja = mov.fBaja ? parseDateStr(mov.fBaja) : null;
+                        
+                        // Evaluamos con >= (Mismo día o superior)
+                        if (emp.bajaDate && dMov && dMov.getTime() >= emp.bajaDate.getTime()) hasPostBajaMovements = true;
+                        if (emp.bajaDate && dBaja && dBaja.getTime() >= emp.bajaDate.getTime()) hasPostBajaMovements = true;
+                        
                         if (mov.tipoFin === '2' || mov.tipoIni === '2') {
                             const d = parseDateStr(mov.fBaja || mov.fMov);
                             if (!maxBaja || d > maxBaja) {
