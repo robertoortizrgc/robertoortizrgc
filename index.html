@@ -21,7 +21,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    <!-- PDF.js para lectura nativa (Agregado para leer SISEC sin copiar/pegar) -->
+    <!-- PDF.js para lectura nativa -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -29,14 +29,11 @@
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     
-    <!-- Aquí es donde React va a "inyectar" toda la aplicación -->
     <div id="root"></div>
 
-    <!-- Script principal de la aplicación -->
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- FUNCIÓN SEGURA PARA COPIAR AL PORTAPAPELES (Evita error en iFrame) ---
         const copyToClipboard = (text) => {
             try {
                 const textArea = document.createElement("textarea");
@@ -50,11 +47,10 @@
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
             } catch (err) {
-                console.error('Error al copiar al portapapeles: ', err);
+                console.error('Error al copiar: ', err);
             }
         };
 
-        // --- SOLUCIÓN ERROR REMOVECHILD: MAPEO SEGURO DE ICONOS ---
         const Icon = ({ name, className }) => {
             const svgString = React.useMemo(() => {
                 if (!window.lucide) return '';
@@ -63,7 +59,6 @@
                 window.lucide.createIcons({ root: div });
                 return div.innerHTML;
             }, [name, className]);
-
             return <span className="contents" dangerouslySetInnerHTML={{ __html: svgString }} />;
         };
 
@@ -102,7 +97,6 @@
         const FileUp = (p) => <Icon name="file-up" {...p} />;
         const CheckCircle = (p) => <Icon name="check-circle" {...p} />;
         const Copy = (p) => <Icon name="copy" {...p} />;
-        const Camera = (p) => <Icon name="camera" {...p} />;
         const ScanLine = (p) => <Icon name="scan-line" {...p} />;
         const Target = (p) => <Icon name="target" {...p} />;
         const Scale = (p) => <Icon name="scale" {...p} />;
@@ -111,8 +105,8 @@
         const Send = (p) => <Icon name="send" {...p} />;
         const Cloud = (p) => <Icon name="cloud" {...p} />;
         const Banknote = (p) => <Icon name="banknote" {...p} />;
+        const ChevronDown = (p) => <Icon name="chevron-down" {...p} />;
 
-        // --- ESTILOS GLOBALES ---
         const customStyles = `
         @media print {
             @page { size: A4 portrait; margin: 1.5cm; }
@@ -139,7 +133,6 @@
         .animate-toast { animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         `;
 
-        // --- DEFINICIONES Y MAPEOS ---
         const ORIGEN_MAP = {
         '0': 'Ventanilla', '1': 'Ajuste automático', '2': 'Dispositivo magnético',
         '3': 'Auditoría (Autocorrección)', '4': 'IDSE (Internet)', '5': 'Auditoría IMSS (SIREM)',
@@ -208,7 +201,7 @@
                     label: 'En Tiempo (Hábiles)',
                     colorClass: 'text-emerald-600',
                     badgeClass: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-                    obs: `Se cruzaron ${weekendDays} días inhábiles (sábado/domingo).`
+                    obs: `Se cruzaron ${weekendDays} días inhábiles.`
                 };
             }
 
@@ -222,10 +215,7 @@
                 level = 4; label = '+ de 1 año'; colorClass = 'text-rose-600'; badgeClass = 'bg-rose-600 border-rose-700 text-white font-black shadow-md';
             }
 
-            if (weekendDays > 0) {
-                obs = `Excedido. Incluye ${weekendDays} días inhábiles de fin de semana.`;
-            }
-
+            if (weekendDays > 0) obs = `Excedido. Incluye ${weekendDays} días inhábiles.`;
             return { isLate: true, isJustified: false, diffDays, businessDays, level, label, colorClass, badgeClass, obs };
         };
 
@@ -261,7 +251,6 @@
             )
         };
 
-        // --- MÓDULO PENSIÓN MEJORADO ---
         const ModuloPension = ({ dataBridge }) => {
             return (
                 <div className="flex flex-col md:flex-row gap-4 h-[85vh] min-h-[600px] bg-slate-50 p-2 rounded-2xl">
@@ -310,16 +299,11 @@
             );
         };
 
-        // --- MÓDULO DE DOCUMENTOS COMPLETO ---
         const ModuloDocumentos = ({ showToast }) => {
             const [docTab, setDocTab] = useState('asesoria');
-            
-            // Estados para Generador de Nombres
             const [clientName, setClientName] = useState('');
             const [docVars, setDocVars] = useState({});
             const [draggedDoc, setDraggedDoc] = useState(null);
-            
-            // Estado para Buscador de Precios
             const [priceSearchTerm, setPriceSearchTerm] = useState('');
 
             const docsConfig = [
@@ -375,7 +359,6 @@
                     link.download = "Plantilla_Carpetas_RGC.zip";
                     link.click();
                 });
-                
                 if(showToast) showToast('Plantilla descargada', 'success');
             };
 
@@ -430,7 +413,6 @@
                     doc.line(40, yPos, 570, yPos);
                     yPos += 25;
 
-                    // Intro
                     doc.setFontSize(11);
                     doc.setTextColor(50, 50, 50);
                     doc.setFont("helvetica", "normal");
@@ -439,7 +421,6 @@
                     doc.text(splitIntro, 40, yPos);
                     yPos += (splitIntro.length * 14) + 20;
 
-                    // Step 1
                     doc.setFontSize(14);
                     doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
                     doc.setFont("helvetica", "bold");
@@ -452,9 +433,8 @@
                     doc.text("Es el primer acercamiento. Revisamos la Constancia de Semanas Cotizadas (SISEC) para dar un panorama general.", 40, yPos);
                     yPos += 20;
 
-                    // Gratuito
                     doc.setFontSize(11);
-                    doc.setTextColor(5, 150, 105); // emerald
+                    doc.setTextColor(5, 150, 105); 
                     doc.setFont("helvetica", "bold");
                     doc.text("PERFIL GRATUITO (PREFERENTEMENTE)", 40, yPos);
                     yPos += 15;
@@ -464,9 +444,8 @@
                     doc.text("• Cliente de 58 años en adelante.\n• Historial limpio (Sin pagos previos de Modalidad 10 o Modalidad 40).\n• Relación laboral tradicional (Sin rastros de simulación laboral).\n• Objetivo: Clientes que buscan financiamiento de Modalidad 40.", 50, yPos);
                     yPos += 65;
 
-                    // Con Costo
                     doc.setFontSize(11);
-                    doc.setTextColor(234, 88, 12); // orange
+                    doc.setTextColor(234, 88, 12); 
                     doc.setFont("helvetica", "bold");
                     doc.text("PERFIL CON COSTO", 40, yPos);
                     yPos += 15;
@@ -476,7 +455,6 @@
                     doc.text("• Clientes de 57 años o menores.\n• Historial con pagos previos de M10 (Trab. independiente o del hogar).\n• Historial con pagos previos de Modalidad 40.\n• Clientes con antecedentes de haber cotizado como Patrón.\n• Casos de simulación laboral o situaciones particulares.", 50, yPos);
                     yPos += 85;
 
-                    // Step 2
                     doc.setFontSize(14);
                     doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
                     doc.setFont("helvetica", "bold");
@@ -503,15 +481,14 @@
                     doc.text("✓ Empresas canceladas (Artículo 251).\n✓ Movimientos generados por Auditoría.\n✓ Fechas de recepción posteriores o anómalas.\n✓ Alteraciones forzadas en el salario base.", 60, yPos);
                     yPos += 65;
 
-                    // Warning Box
                     if(yPos > 600) { doc.addPage(); yPos = 40; } 
                     
-                    doc.setFillColor(254, 242, 242); // rose-50
-                    doc.setDrawColor(225, 29, 72); // rose-600
+                    doc.setFillColor(254, 242, 242); 
+                    doc.setDrawColor(225, 29, 72); 
                     doc.rect(40, yPos, 530, 160, 'FD'); 
                     
                     doc.setFontSize(11);
-                    doc.setTextColor(159, 18, 57); // rose-800
+                    doc.setTextColor(159, 18, 57); 
                     doc.setFont("helvetica", "bold");
                     doc.text("¿Por qué no usamos el SISEC para tramitar pensiones?", 50, yPos + 25);
                     
@@ -525,20 +502,20 @@
                     const footerTxt = "Si el propio IMSS declara que el SISEC no garantiza ningún derecho, ¿por qué dejaríamos tu futuro en manos de un documento \"exclusivamente informativo\"? Por eso el SINDO es el pilar de RGC.";
                     const splitFooter = doc.splitTextToSize(footerTxt, 510);
                     doc.setFont("helvetica", "bold");
-                    doc.setTextColor(225, 29, 72); // rose-600
+                    doc.setTextColor(225, 29, 72); 
                     doc.text(splitFooter, 50, yPos + 55 + (splitWarning.length * 12));
 
                     doc.save(`Asesoria_Paso_a_Paso.pdf`);
                 } catch (error) {
-                    console.error("Error PDF Ruta: ", error);
                     alert("Error al generar PDF.");
                 }
             };
+
             const toolsList = [
-                { title: 'Vale Inicial Digital', desc: 'Registro general de datos y seguimiento inicial de prospectos.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
-                { title: 'Vale Inicial para Contrato M40', desc: 'Formato específico para clientes que iniciarán Modalidad 40.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
-                { title: 'Vale Inicial para RI', desc: 'Formato especial para Recuperación de Inversión (RI).', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' },
-                { title: 'Vale Inicial para Pensión Directa', desc: 'Cuestionario para trámites de pensión directa sin M40.', link: 'https://docs.google.com/forms/d/1f81whvWxCnck953QIb_GdrVwsI-2HLcp1QcSg1-SD7w/preview' }
+                { title: 'Vale Inicial Digital', desc: 'Registro general de datos y seguimiento inicial de prospectos.', link: '#' },
+                { title: 'Vale Inicial para Contrato M40', desc: 'Formato específico para clientes que iniciarán Modalidad 40.', link: '#' },
+                { title: 'Vale Inicial para RI', desc: 'Formato especial para Recuperación de Inversión (RI).', link: '#' },
+                { title: 'Vale Inicial para Pensión Directa', desc: 'Cuestionario para trámites de pensión directa sin M40.', link: '#' }
             ];
 
             const preciosTP = [
@@ -589,14 +566,12 @@
                 { id: 5, name: 'T.H. 100% financiado con TP', price: 'NA', color: 'bg-emerald-500' },
             ];
 
-            // Filtros para buscador de precios
             const filteredTP = preciosTP.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()) || item.desc.toLowerCase().includes(priceSearchTerm.toLowerCase()));
             const filteredGestiones = preciosGestiones.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()));
             const filteredTH = preciosTH.filter(item => item.name.toLowerCase().includes(priceSearchTerm.toLowerCase()));
 
             return (
                 <div className="w-full">
-                    {/* Navegación Interna Documentos */}
                     <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-4 print:hidden">
                         <button onClick={() => setDocTab('asesoria')} className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 ${docTab === 'asesoria' ? 'bg-[#003366] text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
                             <Target className="w-4 h-4" /> Asesoría - Paso a Paso
@@ -618,7 +593,6 @@
                         </button>
                     </div>
 
-                    {/* CONTENIDO: LA RUTA RGC (METODOLOGÍA Y COBROS) */}
                     {docTab === 'asesoria' && (
                         <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
                             <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6 print:hidden">
@@ -697,7 +671,7 @@
                                                 </li>
                                                 <li className="flex items-start gap-2">
                                                     <span className="text-orange-500 mt-0.5 shrink-0">●</span> 
-                                                    <div>Casos de simulación laboral o situaciones particulares detectadas por el gestor.</div>
+                                                    <div>Casos de simulación laboral o situaciones particulares.</div>
                                                 </li>
                                             </ul>
                                         </div>
@@ -758,7 +732,6 @@
                         </div>
                     )}
 
-                    {/* CONTENIDO: PROTOCOLO */}
                     {docTab === 'protocolo' && (
                         <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200 print:hidden">
                             <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6">
@@ -949,7 +922,6 @@
                         </div>
                     )}
 
-                    {/* CONTENIDO: GENERADOR DE NOMBRES */}
                     {docTab === 'generador' && (
                         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 print:hidden">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -971,7 +943,6 @@
                                     <button 
                                         onClick={handleDownloadAllCustomFolders}
                                         className="bg-[#003366] text-white px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#002244] transition-all flex items-center justify-center gap-2 shadow-md shrink-0"
-                                        title="Descarga un archivo ZIP con todas las carpetas vacías nombradas específicamente para este cliente"
                                     >
                                         <DownloadCloud className="w-4 h-4"/> Descargar Todas (.ZIP)
                                     </button>
@@ -1090,7 +1061,6 @@
                                                         <button 
                                                             onClick={handleDownloadSingleFolder}
                                                             className="text-[10px] bg-slate-100 hover:bg-[#003366] hover:text-white text-slate-600 font-black uppercase tracking-widest px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                                                            title="Descargar solo esta carpeta (.zip)"
                                                         >
                                                             <FolderOpen className="w-3.5 h-3.5"/> ZIP
                                                         </button>
@@ -1113,7 +1083,6 @@
                         </div>
                     )}
 
-                    {/* CONTENIDO: LISTADO (IMAGEN RECREADA) */}
                     {docTab === 'listado' && (
                         <div className="flex flex-col items-center">
                             <button onClick={() => window.print()} className="mb-6 bg-[#003366] text-white px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors flex items-center gap-2 shadow-md hover:bg-[#002244] print:hidden">
@@ -1121,7 +1090,6 @@
                             </button>
                             
                             <div className="bg-white p-10 md:p-14 rounded-none shadow-2xl max-w-3xl w-full relative overflow-hidden print:shadow-none print:p-0" style={{aspectRatio: '1 / 1.414'}}>
-                                {/* Marca de agua simulada */}
                                 <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center pointer-events-none z-0 overflow-hidden">
                                     <span className="text-[25rem] font-black text-[#003366] select-none tracking-tighter leading-none -rotate-12">RGC</span>
                                 </div>
@@ -1181,7 +1149,6 @@
                         </div>
                     )}
 
-                    {/* CONTENIDO: HERRAMIENTAS Y VALES */}
                     {docTab === 'herramientas' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
                             
@@ -1243,7 +1210,6 @@
                         </div>
                     )}
 
-                    {/* CONTENIDO: LISTA DE PRECIOS */}
                     {docTab === 'precios' && (
                         <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-slate-200">
                             <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-6 print:hidden">
@@ -1272,13 +1238,11 @@
 
                             <div className="space-y-8 max-w-4xl mx-auto print:max-w-full">
                                 
-                                {/* Info Base */}
                                 <div className="flex flex-wrap justify-between items-center bg-slate-100 p-4 rounded-xl border border-slate-200 font-black uppercase tracking-widest text-slate-500 text-xs md:text-sm">
                                     <span className="flex items-center gap-2"><CalendarX className="w-4 h-4"/> Fecha de elaboración: 3/3/26</span>
                                     <span className="text-[#003366] bg-white border border-slate-200 px-4 py-1.5 rounded-lg shadow-sm">Año: 2026</span>
                                 </div>
 
-                                {/* ESTUDIO PRINCIPAL */}
                                 <div className="bg-gradient-to-r from-[#D4AF37] to-[#e5c965] p-6 rounded-2xl flex flex-wrap justify-between items-center shadow-lg text-[#003366] border border-[#B8962E] relative group">
                                     <div className="flex items-center gap-4 mb-2 md:mb-0">
                                         <div className="w-12 h-12 bg-white/40 rounded-xl flex items-center justify-center font-black text-2xl shadow-sm">1</div>
@@ -1299,7 +1263,6 @@
                                     </div>
                                 </div>
 
-                                {/* TABLA TP */}
                                 {filteredTP.length > 0 && (
                                     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
                                         <table className="w-full text-left border-collapse">
@@ -1336,7 +1299,6 @@
                                     </div>
                                 )}
 
-                                {/* TABLA GESTIONES */}
                                 {filteredGestiones.length > 0 && (
                                     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
                                         <table className="w-full text-left border-collapse">
@@ -1370,7 +1332,6 @@
                                     </div>
                                 )}
 
-                                {/* TABLA T.H. */}
                                 {filteredTH.length > 0 && (
                                     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
                                         <table className="w-full text-left border-collapse">
@@ -1407,7 +1368,6 @@
                                     </div>
                                 )}
 
-                                {/* Empty State Búsqueda */}
                                 {filteredTP.length === 0 && filteredGestiones.length === 0 && filteredTH.length === 0 && (
                                     <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center text-slate-400">
                                         <Search className="w-10 h-10 mb-3 opacity-50" />
@@ -1435,14 +1395,12 @@
         const [isSisecEnabled, setIsSisecEnabled] = useState(false); 
         const [currentModule, setCurrentModule] = useState('menu'); 
         const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-        const [viewMode, setViewMode] = useState('auditor');
+        const [showPdfMenu, setShowPdfMenu] = useState(false);
         
-        // --- ESTADOS DE SEGURIDAD PARA SINDO ---
         const [showSindoAuth, setShowSindoAuth] = useState(false);
         const [sindoPassword, setSindoPassword] = useState('');
         const [sindoAuthError, setSindoAuthError] = useState(false);
 
-        // --- SISTEMA DE TOASTS ---
         const [toasts, setToasts] = useState([]);
         const showToast = (message, type = 'success') => {
             const id = Date.now();
@@ -1452,7 +1410,6 @@
             }, 3000);
         };
 
-        // --- PUENTE A CALCULADORA ---
         const [calcDataBridge, setCalcDataBridge] = useState(null);
 
         useEffect(() => {
@@ -1467,9 +1424,6 @@
             };
         }, []);
 
-        const triggerNativePrint = () => { window.print(); };
-
-        // --- LECTURA NATIVA DE PDF ---
         const handleFileUpload = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -1524,10 +1478,15 @@
             e.target.value = null;
         };
 
-        const handleDownloadPDF = () => {
+        const handleDownloadPDF = (tipoReporte) => {
             if (!parsedData) return;
             setIsGeneratingPDF(true);
-            showToast('Generando Dictamen en PDF...', 'success');
+            
+            let nameDesc = "Historial";
+            if(tipoReporte === 'riesgos') nameDesc = "Riesgos";
+            if(tipoReporte === 'cruce') nameDesc = "Cruce_SISEC";
+            
+            showToast(`Generando PDF: ${nameDesc}...`, 'success');
             
             setTimeout(() => {
                 try {
@@ -1540,17 +1499,20 @@
                     
                     let yPos = 40;
                     
-                    // --- PORTADA / ENCABEZADO ---
+                    let tituloReporte = "DICTAMEN TÉCNICO DE AUDITORÍA SINDO";
+                    if (tipoReporte === 'riesgos') tituloReporte = "DIAGNÓSTICO DE RIESGOS (SINDO)";
+                    if (tipoReporte === 'cruce') tituloReporte = "AUDITORÍA CRUZADA (SINDO VS SISEC)";
+
                     doc.setFontSize(16);
                     doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
                     doc.setFont("helvetica", "bold");
-                    doc.text("DICTAMEN TÉCNICO DE AUDITORÍA SINDO", 40, yPos);
+                    doc.text(tituloReporte, 40, yPos);
                     
                     doc.setFontSize(10);
                     doc.setTextColor(100, 100, 100);
                     doc.setFont("helvetica", "normal");
                     const fechaEmision = new Date().toLocaleDateString('es-MX');
-                    doc.text(`Fecha de Emisión: ${fechaEmision}`, 400, yPos);
+                    doc.text(`Fecha: ${fechaEmision}`, 500, yPos);
                     
                     yPos += 20;
                     doc.setDrawColor(colorGold[0], colorGold[1], colorGold[2]);
@@ -1558,7 +1520,6 @@
                     doc.line(40, yPos, 570, yPos);
                     yPos += 25;
 
-                    // Datos del Asegurado
                     doc.setFontSize(12);
                     doc.setTextColor(0, 0, 0);
                     doc.setFont("helvetica", "bold");
@@ -1576,124 +1537,195 @@
                     }
                     yPos += 30;
 
-                    // --- DIAGNÓSTICO DE RIESGOS ---
-                    doc.setFontSize(12);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
-                    doc.text("2. RESUMEN DE RIESGOS DETECTADOS", 40, yPos);
-                    yPos += 15;
-
-                    doc.setFontSize(10);
-                    doc.setTextColor(0, 0, 0);
-                    doc.setFont("helvetica", "normal");
-                    
-                    const risksText = [
-                        `• Movimientos de Alto Riesgo (Origen 5-9): ${parsedData.stats.totalRisks}`,
-                        `• Tramites Extemporáneos Detectados: ${parsedData.stats.lateEvents.filter(e => !e.isJustified && !e.isMod40Retro).length}`,
-                        `• Empresas Canceladas (Art. 251 / Baja IMSS): ${parsedData.stats.bajaCompanies.length}`
-                    ];
-                    
-                    risksText.forEach(t => {
-                        doc.text(t, 50, yPos);
-                        yPos += 15;
-                    });
-                    
-                    yPos += 15;
-
-                    // --- TABLAS POR EMPRESA ---
-                    doc.setFontSize(12);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
-                    doc.text("3. DETALLE DE MOVIMIENTOS POR EMPRESA (HISTORIAL SINDO)", 40, yPos);
-                    yPos += 20;
-
-                    parsedData.grouped.forEach((group, idx) => {
-                        if (yPos > 650) { doc.addPage(); yPos = 40; }
-
-                        doc.setFontSize(11);
+                    if (tipoReporte === 'historial') {
+                        doc.setFontSize(12);
                         doc.setFont("helvetica", "bold");
                         doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
-                        doc.text(`${idx + 1}. ${group.info.nombre}`, 40, yPos);
-                        yPos += 14;
-                        
-                        doc.setFontSize(9);
-                        doc.setFont("helvetica", "normal");
-                        doc.setTextColor(100, 100, 100);
-                        let subHeader = `Reg. Patronal: ${group.info.registroDisplay} | Periodo: ${group.info.periodIndex} de ${group.info.totalPeriods}`;
-                        if (group.info.isBaja) subHeader += ` | ESTATUS: BAJA POR IMSS (${group.info.bajaReason})`;
-                        if (group.info.isInternalAdjustment) subHeader += ` | ESTATUS: AJUSTE INTERNO IMSS`;
-                        doc.text(subHeader, 40, yPos);
-                        yPos += 10;
+                        doc.text("2. DETALLE DE MOVIMIENTOS POR EMPRESA (HISTORIAL SINDO)", 40, yPos);
+                        yPos += 20;
 
-                        const tableBody = group.movements.map(mov => {
-                            const tipoIni = TIPO_MAP[mov.tipoIni] || mov.tipoIni;
-                            const origenIni = ORIGEN_MAP[mov.origenIni] || mov.origenIni;
-                            const isRiskIni = isRiskOrigin(mov.origenIni);
+                        parsedData.grouped.forEach((group, idx) => {
+                            if (yPos > 650) { doc.addPage(); yPos = 40; }
+
+                            doc.setFontSize(11);
+                            doc.setFont("helvetica", "bold");
+                            doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                            doc.text(`${idx + 1}. ${group.info.nombre}`, 40, yPos);
+                            yPos += 14;
                             
-                            const tipoFin = TIPO_MAP[mov.tipoFin] || mov.tipoFin;
-                            const isBaja = mov.tipoFin === '2';
-                            const origenFin = ORIGEN_MAP[mov.origenFin] || mov.origenFin;
-                            const isRiskFin = isRiskOrigin(mov.origenFin);
+                            doc.setFontSize(9);
+                            doc.setFont("helvetica", "normal");
+                            doc.setTextColor(100, 100, 100);
+                            let subHeader = `Reg. Patronal: ${group.info.registroDisplay} | Periodo: ${group.info.periodIndex} de ${group.info.totalPeriods}`;
+                            if (group.info.isBaja) subHeader += ` | ESTATUS: BAJA POR IMSS (${group.info.bajaReason})`;
+                            if (group.info.isInternalAdjustment) subHeader += ` | ESTATUS: AJUSTE INTERNO IMSS`;
+                            doc.text(subHeader, 40, yPos);
+                            yPos += 10;
 
-                            let obs = [];
-                            if (mov.lateInfo?.isLate) {
-                                if (mov.lateInfo.isMod40Retro) obs.push('M40 Retroactiva');
-                                else if (!mov.lateInfo.isJustified) obs.push(`Extemp: ${mov.lateInfo.label}`);
-                            }
-                            if (isRiskIni) obs.push(`Riesgo (Inicio): Origen ${mov.origenIni}`);
-                            if (isRiskFin && mov.fBaja) obs.push(`Riesgo (Cierre): Origen ${mov.origenFin}`);
-                            if (mov.fRecep === '00/00/0000') obs.push('Fecha Recepción: 00/00/0000');
-                            if (mov.isPostBaja) obs.push('MOVIMIENTO POST-CLAUSURA');
+                            const tableBody = group.movements.map(mov => {
+                                const tipoIni = TIPO_MAP[mov.tipoIni] || mov.tipoIni;
+                                const origenIni = ORIGEN_MAP[mov.origenIni] || mov.origenIni;
+                                const isRiskIni = isRiskOrigin(mov.origenIni);
+                                
+                                const tipoFin = TIPO_MAP[mov.tipoFin] || mov.tipoFin;
+                                const isBaja = mov.tipoFin === '2';
+                                const origenFin = ORIGEN_MAP[mov.origenFin] || mov.origenFin;
+                                const isRiskFin = isRiskOrigin(mov.origenFin);
 
-                            return [
-                                mov.fMov,
-                                `${tipoIni}\nOrigen: ${origenIni}`,
-                                `$${mov.salario}`,
-                                mov.fBaja ? `${mov.fBaja}\n(${isBaja ? 'Baja' : 'Cierre'})` : 'Vigente',
-                                obs.length > 0 ? obs.join('\n') : 'Trámite Regular'
-                            ];
-                        });
-
-                        doc.autoTable({
-                            startY: yPos,
-                            head: [['Fecha Efectiva', 'Movimiento (Inicio)', 'Salario', 'Cierre / Baja', 'Observaciones']],
-                            body: tableBody,
-                            theme: 'grid',
-                            headStyles: { fillColor: colorPrimary, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold', halign: 'center' },
-                            bodyStyles: { fontSize: 8, valign: 'middle', textColor: [50, 50, 50] },
-                            columnStyles: {
-                                0: { cellWidth: 70, halign: 'center', fontStyle: 'bold' },
-                                1: { cellWidth: 140 },
-                                2: { cellWidth: 60, halign: 'right', fontStyle: 'bold' },
-                                3: { cellWidth: 80, halign: 'center' },
-                                4: { cellWidth: 'auto' }
-                            },
-                            didParseCell: function(data) {
-                                if (data.section === 'body' && data.column.index === 4 && data.cell.raw !== 'Trámite Regular') {
-                                    data.cell.styles.textColor = colorRed;
-                                    data.cell.styles.fontStyle = 'bold';
-                                    data.cell.styles.fillColor = [254, 242, 242]; // red-50
+                                let obs = [];
+                                if (mov.lateInfo?.isLate) {
+                                    if (mov.lateInfo.isMod40Retro) obs.push('M40 Retroactiva');
+                                    else if (!mov.lateInfo.isJustified) obs.push(`Extemp: ${mov.lateInfo.label}`);
                                 }
-                            },
-                            margin: { left: 40, right: 40 }
+                                if (isRiskIni) obs.push(`Riesgo (Inicio): Origen ${mov.origenIni}`);
+                                if (isRiskFin && mov.fBaja) obs.push(`Riesgo (Cierre): Origen ${mov.origenFin}`);
+                                if (mov.fRecep === '00/00/0000') obs.push('Fecha Recepción: 00/00/0000');
+                                if (mov.isPostBaja) obs.push('MOVIMIENTO POST-CLAUSURA');
+
+                                return [
+                                    mov.fMov,
+                                    `${tipoIni}\nOrigen: ${origenIni}`,
+                                    `$${mov.salario}`,
+                                    mov.fBaja ? `${mov.fBaja}\n(${isBaja ? 'Baja' : 'Cierre'})` : 'Vigente',
+                                    obs.length > 0 ? obs.join('\n') : 'Trámite Regular'
+                                ];
+                            });
+
+                            doc.autoTable({
+                                startY: yPos,
+                                head: [['Fecha Efectiva', 'Movimiento (Inicio)', 'Salario', 'Cierre / Baja', 'Observaciones']],
+                                body: tableBody,
+                                theme: 'grid',
+                                headStyles: { fillColor: colorPrimary, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold', halign: 'center' },
+                                bodyStyles: { fontSize: 8, valign: 'middle', textColor: [50, 50, 50] },
+                                columnStyles: {
+                                    0: { cellWidth: 70, halign: 'center', fontStyle: 'bold' },
+                                    1: { cellWidth: 140 },
+                                    2: { cellWidth: 60, halign: 'right', fontStyle: 'bold' },
+                                    3: { cellWidth: 80, halign: 'center' },
+                                    4: { cellWidth: 'auto' }
+                                },
+                                didParseCell: function(data) {
+                                    if (data.section === 'body' && data.column.index === 4 && data.cell.raw !== 'Trámite Regular') {
+                                        data.cell.styles.textColor = colorRed;
+                                        data.cell.styles.fontStyle = 'bold';
+                                        data.cell.styles.fillColor = [254, 242, 242];
+                                    }
+                                },
+                                margin: { left: 40, right: 40 }
+                            });
+                            yPos = doc.lastAutoTable.finalY + 25;
                         });
-                        yPos = doc.lastAutoTable.finalY + 25;
-                    });
-                    
-                    // --- SECCIÓN DE CRUCE SISEC ---
-                    if (cruceData && cruceData.patronesComparados.length > 0) {
-                        doc.addPage();
-                        yPos = 40;
-                        doc.setFontSize(16);
+                    }
+
+                    if (tipoReporte === 'riesgos') {
+                        doc.setFontSize(12);
+                        doc.setFont("helvetica", "bold");
+                        doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
+                        doc.text("2. RESUMEN DE RIESGOS DETECTADOS", 40, yPos);
+                        yPos += 15;
+
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont("helvetica", "normal");
+                        
+                        const risksText = [
+                            `• Movimientos de Alto Riesgo (Origen 5-9): ${parsedData.stats.totalRisks}`,
+                            `• Tramites Extemporáneos Detectados: ${parsedData.stats.lateEvents.filter(e => !e.isJustified && !e.isMod40Retro).length}`,
+                            `• Empresas Canceladas (Art. 251 / Baja IMSS): ${parsedData.stats.bajaCompanies.length}`
+                        ];
+                        
+                        risksText.forEach(t => { doc.text(t, 50, yPos); yPos += 15; });
+                        yPos += 15;
+
+                        if(parsedData.stats.riskEvents.length > 0) {
+                            if (yPos > 650) { doc.addPage(); yPos = 40; }
+                            doc.setFontSize(11);
+                            doc.setFont("helvetica", "bold");
+                            doc.setTextColor(colorRed[0], colorRed[1], colorRed[2]);
+                            doc.text("A. DETALLE DE MOVIMIENTOS CRÍTICOS (ORÍGENES DE RIESGO)", 40, yPos);
+                            yPos += 10;
+
+                            const riskBody = parsedData.stats.riskEvents.map(ev => [
+                                ev.empresa, ev.fecha, ev.etapa, `Origen ${ev.origen} (${ORIGEN_MAP[ev.origen]})`
+                            ]);
+
+                            doc.autoTable({
+                                startY: yPos,
+                                head: [['Empresa', 'Fecha', 'Etapa', 'Motivo / Riesgo']],
+                                body: riskBody,
+                                theme: 'grid',
+                                headStyles: { fillColor: colorRed, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+                                bodyStyles: { fontSize: 8, valign: 'middle' },
+                                margin: { left: 40, right: 40 }
+                            });
+                            yPos = doc.lastAutoTable.finalY + 25;
+                        }
+
+                        if(parsedData.stats.lateEvents.length > 0) {
+                            const extempEvents = parsedData.stats.lateEvents.filter(e => !e.isJustified && !e.isMod40Retro);
+                            if(extempEvents.length > 0) {
+                                if (yPos > 650) { doc.addPage(); yPos = 40; }
+                                doc.setFontSize(11);
+                                doc.setFont("helvetica", "bold");
+                                doc.setTextColor(217, 119, 6); // Amber/Orange
+                                doc.text("B. PRESENTACIONES EXTEMPORÁNEAS (RIESGO)", 40, yPos);
+                                yPos += 10;
+
+                                const lateBody = extempEvents.map(ev => [
+                                    ev.empresa, ev.fechaMov, ev.fechaRecep || 'N/A', `${ev.diffDays} días`, ev.label
+                                ]);
+
+                                doc.autoTable({
+                                    startY: yPos,
+                                    head: [['Empresa', 'Fecha Mov', 'Fecha Rec', 'Retraso', 'Estatus']],
+                                    body: lateBody,
+                                    theme: 'grid',
+                                    headStyles: { fillColor: [217, 119, 6], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+                                    bodyStyles: { fontSize: 8, valign: 'middle' },
+                                    margin: { left: 40, right: 40 }
+                                });
+                                yPos = doc.lastAutoTable.finalY + 25;
+                            }
+                        }
+
+                        if(parsedData.stats.bajaCompanies.length > 0) {
+                            if (yPos > 650) { doc.addPage(); yPos = 40; }
+                            doc.setFontSize(11);
+                            doc.setFont("helvetica", "bold");
+                            doc.setTextColor(71, 85, 105); // Slate
+                            doc.text("C. EMPRESAS DADAS DE BAJA (ART. 251)", 40, yPos);
+                            yPos += 10;
+
+                            const bajaBody = parsedData.stats.bajaCompanies.map(b => [
+                                b.nombre, b.workerBajaDateStr, b.razon, b.hasPostBajaMovements ? 'SI (ALERTA)' : 'NO'
+                            ]);
+
+                            doc.autoTable({
+                                startY: yPos,
+                                head: [['Empresa', 'Baja Trabajador', 'Causa', 'Cotiz. Post-Baja']],
+                                body: bajaBody,
+                                theme: 'grid',
+                                headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+                                bodyStyles: { fontSize: 8, valign: 'middle' },
+                                didParseCell: function(data) {
+                                    if (data.section === 'body' && data.column.index === 3 && data.cell.raw === 'SI (ALERTA)') {
+                                        data.cell.styles.textColor = colorRed;
+                                        data.cell.styles.fontStyle = 'bold';
+                                    }
+                                },
+                                margin: { left: 40, right: 40 }
+                            });
+                            yPos = doc.lastAutoTable.finalY + 25;
+                        }
+                    }
+
+                    if (tipoReporte === 'cruce' && cruceData && cruceData.patronesComparados.length > 0) {
+                        doc.setFontSize(12);
                         doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
                         doc.setFont("helvetica", "bold");
-                        doc.text("4. AUDITORÍA CRUZADA: SINDO VS SISEC", 40, yPos);
-                        
-                        yPos += 10;
-                        doc.setDrawColor(colorGold[0], colorGold[1], colorGold[2]);
-                        doc.setLineWidth(2);
-                        doc.line(40, yPos, 570, yPos);
-                        yPos += 25;
+                        doc.text("2. AUDITORÍA CRUZADA: SINDO VS SISEC", 40, yPos);
+                        yPos += 20;
 
                         cruceData.patronesComparados.forEach((comp, idx) => {
                              if (yPos > 650) { doc.addPage(); yPos = 40; }
@@ -1740,7 +1772,7 @@
                                         if (data.cell.raw !== 'Coincide OK') {
                                             data.cell.styles.textColor = colorRed;
                                         } else {
-                                            data.cell.styles.textColor = [5, 150, 105]; // emerald
+                                            data.cell.styles.textColor = [5, 150, 105]; 
                                         }
                                     }
                                 },
@@ -1750,7 +1782,6 @@
                         });
                     }
 
-                    // --- PIE DE PÁGINA (PAGINACIÓN) ---
                     const pageCount = doc.internal.getNumberOfPages();
                     doc.setFontSize(8);
                     doc.setTextColor(150, 150, 150);
@@ -1759,7 +1790,7 @@
                         doc.text(`Página ${i} de ${pageCount} - Dictamen Generado por Portal RGC`, 40, 770);
                     }
 
-                    doc.save(`Dictamen_RGC_${parsedData.personal?.nss || 'Auditoria'}.pdf`);
+                    doc.save(`Dictamen_RGC_${nameDesc}_${parsedData.personal?.nss || 'Auditoria'}.pdf`);
                     showToast('PDF descargado exitosamente', 'success');
                 } catch (error) {
                     console.error("Error al generar PDF: ", error);
@@ -2024,7 +2055,6 @@
 
                 group.movements.forEach(mov => {
                 
-                // --- DETECCIÓN DE MOVIMIENTOS POST-CLAUSURA (Mismo día o posterior) ---
                 if (group.info.isBaja && group.info.bajaDate) {
                     const dMov = parseDateStr(mov.fMov);
                     const dBaja = mov.fBaja ? parseDateStr(mov.fBaja) : null;
@@ -2082,7 +2112,6 @@
                     stats.riskEvents.push({ empresa: empNameWithPeriod, fecha: mov.fBaja || mov.fMov, origen: mov.origenFin, tipo: mov.tipoFin, etapa: 'CIERRE', desc: TIPO_MAP[mov.tipoFin] || 'Desconocido' });
                 }
                 
-                // Sumar al total de conflictos post-baja para las estadísticas
                 if (mov.isPostBaja) {
                     stats.bajaConflicts++;
                 }
@@ -2102,7 +2131,6 @@
                         const dMov = parseDateStr(mov.fMov);
                         const dBaja = mov.fBaja ? parseDateStr(mov.fBaja) : null;
                         
-                        // Evaluamos con >= (Mismo día o superior)
                         if (emp.bajaDate && dMov && dMov.getTime() >= emp.bajaDate.getTime()) hasPostBajaMovements = true;
                         if (emp.bajaDate && dBaja && dBaja.getTime() >= emp.bajaDate.getTime()) hasPostBajaMovements = true;
                         
@@ -2460,7 +2488,7 @@
                 ))}
             </div>
 
-            <div id="informe-auditoria" className={`max-w-6xl mx-auto space-y-6 print:space-y-4 ${isGeneratingPDF ? 'pdf-mode' : ''}`}>
+            <div id="informe-auditoria" className={`max-w-6xl mx-auto space-y-6 print:space-y-4 ${isGeneratingPDF ? 'pdf-mode' : ''}`} onMouseLeave={() => setShowPdfMenu(false)}>
 
                 <div className="hidden print:block print:min-h-screen">
                 <div className="flex flex-col items-center justify-center border-b-[8px] border-[#D4AF37] pb-8 mb-8 mt-12 text-center">
@@ -2635,48 +2663,42 @@
                         </div>
 
                         <div className="flex gap-3 items-center">
-                            <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                                <button 
-                                    onClick={() => setViewMode('cliente')} 
-                                    className={`px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1 ${viewMode === 'cliente' ? 'bg-white text-[#003366] shadow-sm' : 'text-slate-400'}`}
-                                >
-                                    <Eye className="w-3 h-3" /> Cliente
-                                </button>
-                                <button 
-                                    onClick={() => setViewMode('auditor')} 
-                                    className={`px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1 ${viewMode === 'auditor' ? 'bg-[#003366] text-white shadow-sm' : 'text-slate-400'}`}
-                                >
-                                    <LayoutGrid className="w-3 h-3" /> Auditor (Técnico)
-                                </button>
-                            </div>
-
-                            <div className="w-px h-8 bg-slate-200 mx-1"></div>
-
+                            
                             {cruceData && (
                                 <button 
                                 onClick={handleDownloadCSV}
                                 className="px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-emerald-700 hover:bg-emerald-50 transition-colors flex items-center gap-2"
                                 >
-                                    <FileSpreadsheet className="w-4 h-4" /> Excel
+                                    <FileSpreadsheet className="w-4 h-4" /> Excel (Cruce)
                                 </button>
                             )}
 
-                            <div className="flex gap-2 relative group">
+                            <div className="relative">
                                 <button 
-                                onClick={triggerNativePrint} 
-                                className="px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                                title="Imprimir o Guardar como PDF (Nativo)"
-                                >
-                                    <Printer className="w-4 h-4" /> Imprimir
-                                </button>
-                                <button 
-                                onClick={handleDownloadPDF} 
+                                onClick={() => setShowPdfMenu(!showPdfMenu)} 
                                 disabled={isGeneratingPDF}
-                                className="px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#003366] hover:bg-black transition-colors flex items-center gap-2 shadow-md disabled:opacity-50"
+                                className="px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest text-white bg-[#003366] hover:bg-[#002244] transition-colors flex items-center gap-2 shadow-md disabled:opacity-50"
                                 >
                                     <Download className={`w-4 h-4 ${isGeneratingPDF ? 'animate-bounce' : ''} text-[#D4AF37]`} /> 
                                     {isGeneratingPDF ? "Generando..." : "Descargar PDF"}
+                                    <ChevronDown className="w-3.5 h-3.5 opacity-70" />
                                 </button>
+
+                                {showPdfMenu && (
+                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 transform origin-top-right transition-all">
+                                        <button onClick={() => { setShowPdfMenu(false); handleDownloadPDF('historial'); }} className="w-full text-left px-4 py-3.5 text-[10px] font-black uppercase tracking-widest text-[#003366] hover:bg-slate-50 border-b border-slate-100 flex items-center gap-2.5 transition-colors">
+                                            <Briefcase className="w-4 h-4 text-[#D4AF37]" /> 1. Historial Completo
+                                        </button>
+                                        <button onClick={() => { setShowPdfMenu(false); handleDownloadPDF('riesgos'); }} className="w-full text-left px-4 py-3.5 text-[10px] font-black uppercase tracking-widest text-rose-700 hover:bg-rose-50 border-b border-slate-100 flex items-center gap-2.5 transition-colors">
+                                            <AlertTriangle className="w-4 h-4 text-rose-500" /> 2. Riesgos Críticos
+                                        </button>
+                                        {cruceData && (
+                                            <button onClick={() => { setShowPdfMenu(false); handleDownloadPDF('cruce'); }} className="w-full text-left px-4 py-3.5 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:bg-emerald-50 flex items-center gap-2.5 transition-colors">
+                                                <GitMerge className="w-4 h-4 text-emerald-600" /> 3. SINDO vs SISEC
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2790,7 +2812,7 @@
                                                             {mov.lateInfo.isMod40Retro ? <History className="w-3 h-3" /> : (mov.lateInfo.isJustified ? <CheckCircle2 className="w-3 h-3" /> : <Thermometer className="w-3 h-3" />)}
                                                             <span className="uppercase tracking-widest text-[8px]">{mov.lateInfo.isMod40Retro ? mov.lateInfo.label : (mov.lateInfo.isJustified ? 'EN TIEMPO' : `Extemp: ${mov.lateInfo.label}`)}</span>
                                                             </div>
-                                                            {viewMode === 'auditor' && <span className="opacity-80 font-mono">Rec: {mov.fRecep}</span>}
+                                                            <span className="opacity-80 font-mono">Rec: {mov.fRecep}</span>
                                                             {mov.lateInfo.obs && !mov.lateInfo.isMod40Retro && (
                                                                 <span className="text-[7px] leading-tight opacity-80 mt-0.5 italic max-w-[120px]">{mov.lateInfo.obs}</span>
                                                             )}
@@ -2807,20 +2829,11 @@
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 align-top">
-                                                    {viewMode === 'auditor' ? (
-                                                        <div className="flex flex-wrap gap-2 items-center">
-                                                            <StatusBadge code={mov.tipoIni} map={TIPO_MAP} type="T" colorOverride={isReingreso ? 'bg-emerald-50 text-emerald-700 border-emerald-200 print-border' : 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border'} />
-                                                            <ArrowRight className="w-3 h-3 text-slate-300 print:hidden" />
-                                                            <StatusBadge code={mov.origenIni} map={ORIGEN_MAP} type="O" isRisk={riskIni} />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex flex-col gap-1">
-                                                            <span className={`text-xs font-black uppercase tracking-widest ${isReingreso ? 'text-emerald-700' : 'text-[#003366]'}`}>{TIPO_MAP[mov.tipoIni]}</span>
-                                                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border w-fit ${riskIni ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                                {riskIni ? 'Alerta: Auditoría IMSS' : 'Trámite Regular'}
-                                                            </span>
-                                                        </div>
-                                                    )}
+                                                    <div className="flex flex-wrap gap-2 items-center">
+                                                        <StatusBadge code={mov.tipoIni} map={TIPO_MAP} type="T" colorOverride={isReingreso ? 'bg-emerald-50 text-emerald-700 border-emerald-200 print-border' : 'bg-[#003366]/10 text-[#003366] border-[#003366]/20 print-border'} />
+                                                        <ArrowRight className="w-3 h-3 text-slate-300 print:hidden" />
+                                                        <StatusBadge code={mov.origenIni} map={ORIGEN_MAP} type="O" isRisk={riskIni} />
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right align-top">
                                                     <span className="font-mono font-black text-slate-700 text-base">${mov.salario}</span>
@@ -2847,17 +2860,11 @@
                                                             </div>
                                                         )}
 
-                                                        {viewMode === 'auditor' ? (
-                                                            <div className="flex flex-wrap gap-2 items-center">
-                                                                <StatusBadge code={mov.tipoFin} map={TIPO_MAP} type="T" colorOverride={isRealBaja ? "bg-rose-50 text-rose-800 border-rose-200 print-border" : "bg-slate-50 text-slate-600 border-slate-200 print-border"} />
-                                                                <span className="text-[9px] text-slate-300 print:hidden">+</span>
-                                                                <StatusBadge code={mov.origenFin} map={ORIGEN_MAP} type="O" isRisk={riskFin} />
-                                                            </div>
-                                                        ) : (
-                                                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border w-fit mt-1 ${riskFin ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                                {riskFin ? 'Cierre forzado por IMSS' : 'Trámite Regular'}
-                                                            </span>
-                                                        )}
+                                                        <div className="flex flex-wrap gap-2 items-center">
+                                                            <StatusBadge code={mov.tipoFin} map={TIPO_MAP} type="T" colorOverride={isRealBaja ? "bg-rose-50 text-rose-800 border-rose-200 print-border" : "bg-slate-50 text-slate-600 border-slate-200 print-border"} />
+                                                            <span className="text-[9px] text-slate-300 print:hidden">+</span>
+                                                            <StatusBadge code={mov.origenFin} map={ORIGEN_MAP} type="O" isRisk={riskFin} />
+                                                        </div>
                                                         </div>
                                                     ) : (
                                                         <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
@@ -3231,5 +3238,3 @@
     </script>
 </body>
 </html>
-robertoortiz
-roberto ortiz
